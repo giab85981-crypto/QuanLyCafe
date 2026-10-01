@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
@@ -29,3 +30,18 @@ function App() {
 }
 
 export default App;
+=======
+import Header from './components/Header'
+import Dashboard from './pages/Dashboard'
+
+function App() {
+  return (
+    <>
+      <Header />
+      <Dashboard />
+    </>
+  )
+}
+
+export default App
+>>>>>>> f7bd02673a8e7430fa9874fdcc5d5f9f734bba83
