@@ -1,32 +1,35 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg: #faf6ef;
+  --bg: #ebeef2;
   --surface: #ffffff;
-  --line: #ede3d6;
-
-  --coffee-900: #0f3d73;
-  --coffee-700: #1f5fc4;
-  --coffee-500: #4a86e8;
-  --coffee-100: #e8f0fe;
-
-  --amber-500: #e0983d;
-  --amber-100: #fbeedb;
-
-  --green-600: #2f9e52;
-  --green-100: #e5f6ea;
-
-  --blue-600: #3b82c4;
-  --blue-100: #e7f1fb;
-
-  --text: #2b2118;
-  --text-mute: #8b7c6c;
-
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-
-  --shadow-card: 0 1px 2px rgba(62, 39, 35, 0.06), 0 1px 0 rgba(62, 39, 35, 0.04);
+  --line: #dde2e8;
+ 
+  --nav-bg: #0070e0;
+  --nav-active: #0058b3;
+ 
+  --coffee-900: #0d2c4f;
+  --coffee-700: #0070e0;
+  --coffee-500: #4096ee;
+  --coffee-100: #e5f0fc;
+ 
+  --amber-500: #f5a623;
+  --amber-100: #fff4de;
+ 
+  --green-600: #1fa65a;
+  --green-100: #e3f6ec;
+ 
+  --blue-600: #0070e0;
+  --blue-100: #e5f0fc;
+ 
+  --text: #263238;
+  --text-mute: #6f7c88;
+ 
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+ 
+  --shadow-card: 0 1px 2px rgba(15, 40, 70, 0.08);
 }
 
 * {

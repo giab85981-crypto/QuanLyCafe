@@ -1,0 +1,130 @@
+.menu-page {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px;
+  align-items: start;
+}
+ 
+.menu-side,
+.menu-main {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+ 
+.menu-side {
+  padding: 12px 0;
+}
+ 
+.menu-side h3 {
+  font-size: 14px;
+  padding: 0 14px 8px;
+}
+ 
+.menu-side ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+ 
+.menu-side button {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 9px 14px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  border-left: 3px solid transparent;
+}
+ 
+.menu-side button:hover {
+  background: var(--coffee-100);
+}
+ 
+.menu-side button.is-active {
+  color: var(--coffee-700);
+  font-weight: 700;
+  background: var(--coffee-100);
+  border-left-color: var(--coffee-700);
+}
+ 
+.menu-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+ 
+.menu-bar h1 {
+  font-size: 20px;
+}
+ 
+.menu-search {
+  width: 280px;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: 14px;
+}
+ 
+.menu-search:focus {
+  outline: 2px solid var(--coffee-500);
+  outline-offset: -1px;
+}
+ 
+.menu-error {
+  margin: 12px 16px 0;
+  padding: 10px 12px;
+  background: #fdecea;
+  color: #b3261e;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+ 
+.menu-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+ 
+.menu-table th {
+  text-align: left;
+  background: var(--coffee-100);
+  color: var(--coffee-900);
+  font-weight: 700;
+  padding: 10px 16px;
+}
+ 
+.menu-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+ 
+.menu-table .num {
+  text-align: right;
+}
+ 
+.menu-table tbody tr:hover {
+  background: #f6f9fd;
+}
+ 
+.menu-empty {
+  text-align: center;
+  color: var(--text-mute);
+  padding: 28px 16px !important;
+}
+ 
+@media (max-width: 760px) {
+  .menu-page {
+    grid-template-columns: 1fr;
+  }
+}
+ 

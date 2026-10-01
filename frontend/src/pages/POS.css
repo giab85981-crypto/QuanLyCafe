@@ -1,0 +1,51 @@
+.pos { display: flex; flex-direction: column; height: 100vh; }
+ 
+.pos__bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 48px; padding: 0 16px; background: var(--nav-bg); color: #fff; }
+.pos__search { width: 320px; max-width: 50%; border: none; border-radius: var(--radius-md); padding: 7px 12px; font-size: 14px; }
+.pos__bar-right { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.pos__bar-right button { border: 1px solid rgba(255,255,255,.5); background: transparent; color: #fff; border-radius: var(--radius-md); padding: 6px 12px; cursor: pointer; }
+.pos__bar-right button:hover { background: rgba(255,255,255,.14); }
+ 
+.pos__body { flex: 1; display: grid; grid-template-columns: 1fr 380px; min-height: 0; }
+ 
+.pos__left { display: flex; flex-direction: column; min-height: 0; padding: 12px; gap: 10px; overflow: hidden; }
+.pos__tables, .pos__cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.pos__table, .pos__cats button { border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius-md); padding: 7px 14px; font-size: 13px; cursor: pointer; color: var(--text); }
+.pos__table.is-busy { background: var(--amber-100); border-color: var(--amber-500); }
+.pos__table.is-active, .pos__cats button.is-active { background: var(--coffee-700); border-color: var(--coffee-700); color: #fff; font-weight: 700; }
+ 
+.pos__foods { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; align-content: start; }
+.pos__food { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-height: 76px; text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius-md); padding: 10px; cursor: pointer; }
+.pos__food:hover:not(:disabled) { border-color: var(--coffee-500); background: var(--coffee-100); }
+.pos__food:disabled { opacity: .55; cursor: not-allowed; }
+.pos__food-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.pos__food-price { font-size: 13px; color: var(--coffee-700); font-weight: 700; }
+ 
+.pos__bill { display: flex; flex-direction: column; min-height: 0; background: var(--surface); border-left: 1px solid var(--line); }
+.pos__bill-head { padding: 14px 16px; font-weight: 700; font-size: 16px; color: var(--coffee-900); border-bottom: 1px solid var(--line); }
+.pos__items { flex: 1; overflow-y: auto; list-style: none; margin: 0; padding: 0; }
+.pos__items li { display: grid; grid-template-columns: 1fr auto 84px; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.pos__qty { display: flex; align-items: center; gap: 8px; }
+.pos__qty button { width: 26px; height: 26px; border: 1px solid var(--line); background: var(--surface); border-radius: 50%; cursor: pointer; font-size: 15px; line-height: 1; }
+.pos__qty button:hover:not(:disabled) { border-color: var(--coffee-500); color: var(--coffee-700); }
+.pos__item-total { text-align: right; font-weight: 600; }
+.pos__items .pos__empty { display: block; color: var(--text-mute); text-align: center; padding: 28px 16px; }
+ 
+.pos__sum { padding: 12px 16px; border-top: 1px solid var(--line); display: grid; gap: 8px; font-size: 14px; }
+.pos__sum > div { display: flex; justify-content: space-between; align-items: center; }
+.pos__sum input { width: 64px; text-align: right; border: 1px solid var(--line); border-radius: var(--radius-md); padding: 4px 6px; }
+.pos__total { font-size: 18px; font-weight: 800; color: var(--coffee-700); }
+ 
+.pos__msg { margin: 0 16px 8px; font-size: 13px; color: var(--coffee-900); background: var(--coffee-100); border-radius: var(--radius-md); padding: 8px 10px; }
+ 
+.pos__actions { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; padding: 12px 16px 16px; }
+.pos__actions button { border: 1px solid var(--coffee-700); background: var(--surface); color: var(--coffee-700); border-radius: var(--radius-md); padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; }
+.pos__actions button.is-pay { background: var(--coffee-700); color: #fff; }
+.pos__actions button:disabled { opacity: .5; cursor: not-allowed; }
+ 
+@media (max-width: 900px) {
+  .pos { height: auto; min-height: 100vh; }
+  .pos__body { grid-template-columns: 1fr; }
+  .pos__bill { border-left: none; border-top: 1px solid var(--line); }
+}
+ 
