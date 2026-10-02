@@ -17,8 +17,6 @@ namespace CafeManagement.API.Controllers
             _context = context;
         }
 
-        // ==================== APIS KHU VỰC (AREA) ====================
-
         [HttpGet("areas")]
         public async Task<IActionResult> GetAreas()
         {
@@ -47,8 +45,6 @@ namespace CafeManagement.API.Controllers
 
             return Ok(area);
         }
-
-        // ==================== APIS PHÒNG / BÀN (TABLE) ====================
 
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] int? areaId, [FromQuery] string? search, [FromQuery] string? status)

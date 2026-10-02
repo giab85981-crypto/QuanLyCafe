@@ -29,7 +29,8 @@ namespace CafeManagement.API.Controllers
                     Price = f.Price,
                     CostPrice = f.CostPrice,
                     IdCategory = f.IdCategory,
-                    CategoryName = f.Category.Name
+                    CategoryName = f.Category != null ? f.Category.Name : string.Empty,
+                    ItemType = f.ItemType
                 })
                 .ToListAsync();
 
@@ -44,13 +45,30 @@ namespace CafeManagement.API.Controllers
                 Name = dto.Name,
                 Price = dto.Price,
                 CostPrice = dto.CostPrice,
-                IdCategory = dto.IdCategory
+                IdCategory = dto.IdCategory,
+                ItemType = dto.ItemType
             };
 
             _context.Foods.Add(food);
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Thêm món ăn thành công!", id = food.Id });
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateFoodDto dto)
+        {
+            var food = await _context.Foods.FindAsync(id);
+            if (food == null) return NotFound("Không tìm thấy món ăn!");
+
+            food.Name = dto.Name;
+            food.Price = dto.Price;
+            food.CostPrice = dto.CostPrice;
+            food.IdCategory = dto.IdCategory;
+            food.ItemType = dto.ItemType;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Cập nhật món ăn thành công!" });
         }
 
         [HttpDelete("{id}")]

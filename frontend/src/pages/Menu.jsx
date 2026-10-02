@@ -10,15 +10,19 @@ import {
   Settings,
   Star,
   X,
+  Plus,
+  Pencil,
 } from 'lucide-react'
 import axiosClient from '../api/axiosClient'
 import './Menu.css'
 
 const money = (n) => Number(n || 0).toLocaleString('vi-VN')
 
-// Khớp đúng CreateFoodDto bên backend: { Name, Price, CostPrice, IdCategory }
-// (JSON trả về/nhận vào ở dạng camelCase: name, price, costPrice, idCategory)
-const initialForm = { name: '', idCategory: '', price: '', costPrice: '' }
+// Khớp CreateFoodDto/UpdateFoodDto bên backend: { Name, Price, CostPrice, IdCategory, ItemType }
+const initialForm = { name: '', idCategory: '', price: '', costPrice: '', itemType: '' }
+
+// Danh sách "Loại món" cố định — có thể chỉnh lại cho đúng nhu cầu quán
+const ITEM_TYPES = ['Món chế biến', 'Hàng hóa', 'Dịch vụ']
 
 function Menu() {
   const [foods, setFoods] = useState([])
@@ -28,15 +32,22 @@ function Menu() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // UI-only: chọn dòng / đánh dấu món hay bán (chưa gắn API vì backend chưa có field này)
+  // UI-only: chọn dòng / đánh dấu món hay bán (chưa có field tương ứng ở backend)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [favoriteIds, setFavoriteIds] = useState(new Set())
 
-  // Modal "Món mới"
+  // Modal "Món mới" / "Sửa món" — dùng chung, phân biệt bằng editingId
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(initialForm)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+
+  // "+ Tạo mới" nhóm món (category) ở sidebar
+  const [showNewCat, setShowNewCat] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [savingCat, setSavingCat] = useState(false)
+  const [catError, setCatError] = useState('')
 
   // Import CSV
   const fileInputRef = useRef(null)
@@ -88,9 +99,58 @@ function Menu() {
     })
   }
 
-  // ---- "Món mới": modal + POST /api/Food ----
+  // ---- "+ Tạo mới" nhóm món: POST /api/FoodCategory ----
+  const openNewCat = () => {
+    setNewCatName('')
+    setCatError('')
+    setShowNewCat(true)
+  }
+
+  const cancelNewCat = () => {
+    if (savingCat) return
+    setShowNewCat(false)
+  }
+
+  const handleCreateCategory = async (e) => {
+    e.preventDefault()
+    if (!newCatName.trim()) {
+      setCatError('Vui lòng nhập tên nhóm món.')
+      return
+    }
+
+    setSavingCat(true)
+    setCatError('')
+    try {
+      const res = await axiosClient.post('/FoodCategory', { name: newCatName.trim() })
+      const created = res.data
+      setCategories((prev) => [...prev, created])
+      setActiveCat(created.id)
+      setShowNewCat(false)
+    } catch (err) {
+      setCatError('Tạo nhóm món thất bại. Kiểm tra lại kết nối backend.')
+    } finally {
+      setSavingCat(false)
+    }
+  }
+
+  // ---- "Món mới": mở modal ở chế độ thêm ----
   const openAddModal = () => {
-    setForm({ ...initialForm, idCategory: categories[0]?.id ?? '' })
+    setEditingId(null)
+    setForm({ ...initialForm, idCategory: categories[0]?.id ?? '', itemType: ITEM_TYPES[0] })
+    setFormError('')
+    setShowAddModal(true)
+  }
+
+  // ---- "Sửa": mở modal ở chế độ sửa, điền sẵn dữ liệu của món đang chọn ----
+  const openEditModal = (food) => {
+    setEditingId(food.id)
+    setForm({
+      name: food.name,
+      idCategory: food.idCategory,
+      price: food.price,
+      costPrice: food.costPrice,
+      itemType: food.itemType || ITEM_TYPES[0],
+    })
     setFormError('')
     setShowAddModal(true)
   }
@@ -112,37 +172,49 @@ function Menu() {
       return
     }
 
+    const payload = {
+      name: form.name.trim(),
+      idCategory: Number(form.idCategory),
+      price: Number(form.price) || 0,
+      costPrice: Number(form.costPrice) || 0,
+      itemType: form.itemType || '',
+    }
+
     setSaving(true)
     setFormError('')
     try {
-      await axiosClient.post('/Food', {
-        name: form.name.trim(),
-        idCategory: Number(form.idCategory),
-        price: Number(form.price) || 0,
-        costPrice: Number(form.costPrice) || 0,
-      })
+      if (editingId) {
+        await axiosClient.put(`/Food/${editingId}`, payload)
+      } else {
+        await axiosClient.post('/Food', payload)
+      }
       setShowAddModal(false)
       loadFoods()
     } catch (err) {
-      setFormError('Thêm món thất bại. Kiểm tra lại dữ liệu hoặc kết nối backend.')
+      setFormError(
+        editingId
+          ? 'Cập nhật món thất bại. Kiểm tra lại dữ liệu hoặc kết nối backend.'
+          : 'Thêm món thất bại. Kiểm tra lại dữ liệu hoặc kết nối backend.',
+      )
     } finally {
       setSaving(false)
     }
   }
 
-  // ---- "Xuất file": xuất Excel (.xlsx) thật sự bằng thư viện xlsx (SheetJS) ----
+  // ---- "Xuất file": xuất Excel (.xlsx) bằng thư viện xlsx (SheetJS) ----
   // Cần cài: npm install xlsx
   const handleExport = () => {
     const data = rows.map((f) => ({
       'Mã món': `MN${String(f.id).padStart(4, '0')}`,
       'Tên món': f.name,
       'Nhóm món': f.categoryName,
+      'Loại món': f.itemType || '',
       'Giá bán': f.price,
       'Giá vốn': f.costPrice,
     }))
 
     const worksheet = XLSX.utils.json_to_sheet(data)
-    worksheet['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 16 }, { wch: 12 }, { wch: 12 }]
+    worksheet['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 12 }]
 
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Thực đơn')
@@ -150,7 +222,7 @@ function Menu() {
     XLSX.writeFile(workbook, `thuc-don-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
-  // ---- "Import": đọc file CSV (Tên món,Nhóm món,Giá bán,Giá vốn) và POST từng dòng lên /api/Food ----
+  // ---- "Import": đọc CSV (Tên món,Nhóm món,Giá bán,Giá vốn) và POST từng dòng ----
   const handleImportClick = () => {
     fileInputRef.current?.click()
   }
@@ -164,7 +236,6 @@ function Menu() {
     try {
       const text = await file.text()
       const lines = text.split(/\r?\n/).filter((l) => l.trim())
-      // Bỏ dòng tiêu đề nếu dòng đầu không phải dữ liệu số ở cột giá
       const dataLines = /^[^,]+,[^,]+,\s*\d/.test(lines[0]) ? lines : lines.slice(1)
 
       const items = dataLines
@@ -176,6 +247,7 @@ function Menu() {
             idCategory: match ? match.id : null,
             price: Number(price) || 0,
             costPrice: Number(costPrice) || 0,
+            itemType: '', // CSV import chưa có cột Loại món, để trống
           }
         })
         .filter((item) => item.name && item.idCategory)
@@ -200,7 +272,33 @@ function Menu() {
   return (
     <div className="menu-page">
       <aside className="menu-side">
-        <h3>Nhóm hàng</h3>
+        <div className="menu-side-head">
+          <h3>Nhóm hàng</h3>
+          <button className="link-btn" type="button" onClick={openNewCat}>
+            <Plus size={14} /> Tạo mới
+          </button>
+        </div>
+
+        {showNewCat && (
+          <form className="new-cat-form" onSubmit={handleCreateCategory}>
+            {catError && <div className="menu-error menu-error-sm">{catError}</div>}
+            <input
+              autoFocus
+              placeholder="Tên nhóm món mới"
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+            />
+            <div className="new-cat-actions">
+              <button type="button" className="btn-outline btn-sm" onClick={cancelNewCat} disabled={savingCat}>
+                Hủy
+              </button>
+              <button type="submit" className="btn-new btn-sm" disabled={savingCat}>
+                {savingCat ? 'Đang lưu...' : 'Lưu'}
+              </button>
+            </div>
+          </form>
+        )}
+
         <ul>
           <li>
             <button className={activeCat === null ? 'is-active' : ''} onClick={() => setActiveCat(null)}>
@@ -274,9 +372,9 @@ function Menu() {
               <th>Mã món</th>
               <th>Tên món</th>
               <th>Nhóm món</th>
-              <th>Loại thực đơn</th>
               <th>Loại món</th>
               <th className="num">Giá bán</th>
+              <th className="col-actions"></th>
             </tr>
           </thead>
           <tbody>
@@ -308,9 +406,18 @@ function Menu() {
                 <td>MN{String(f.id).padStart(4, '0')}</td>
                 <td>{f.name}</td>
                 <td>{f.categoryName}</td>
-                <td>Đồ uống</td>
-                <td>Món chế biến</td>
+                <td>{f.itemType || '-'}</td>
                 <td className="num">{money(f.price)}</td>
+                <td className="col-actions">
+                  <button
+                    type="button"
+                    className="edit-btn"
+                    onClick={() => openEditModal(f)}
+                    title="Sửa món"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -321,7 +428,7 @@ function Menu() {
         <div className="modal-overlay" onClick={closeAddModal}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Thêm món mới</h2>
+              <h2>{editingId ? 'Sửa món' : 'Thêm món mới'}</h2>
               <button className="icon-btn" type="button" onClick={closeAddModal}>
                 <X size={18} />
               </button>
@@ -335,14 +442,24 @@ function Menu() {
                 <input name="name" value={form.name} onChange={handleFormChange} placeholder="VD: Cà phê sữa" />
               </label>
 
-              <label className="form-field">
-                <span>Nhóm món</span>
-                <select name="idCategory" value={form.idCategory} onChange={handleFormChange}>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </label>
+              <div className="form-row">
+                <label className="form-field">
+                  <span>Nhóm món</span>
+                  <select name="idCategory" value={form.idCategory} onChange={handleFormChange}>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>Loại món</span>
+                  <select name="itemType" value={form.itemType} onChange={handleFormChange}>
+                    {ITEM_TYPES.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
 
               <div className="form-row">
                 <label className="form-field">
@@ -360,7 +477,7 @@ function Menu() {
                   Hủy
                 </button>
                 <button type="submit" className="btn-new" disabled={saving}>
-                  {saving ? 'Đang lưu...' : 'Lưu'}
+                  {saving ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : 'Lưu'}
                 </button>
               </div>
             </form>

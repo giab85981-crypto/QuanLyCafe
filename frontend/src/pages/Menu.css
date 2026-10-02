@@ -324,3 +324,99 @@
   gap: 8px;
   margin-top: 4px;
 }
+
+/* ---- "+ Tạo mới" nhóm món ở sidebar ---- */
+.menu-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px 8px;
+}
+
+.menu-side-head h3 {
+  padding: 0;
+}
+
+.link-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--coffee-700);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.link-btn:hover {
+  color: var(--coffee-500);
+}
+
+.new-cat-form {
+  padding: 0 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.new-cat-form input {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.new-cat-form input:focus {
+  outline: 2px solid var(--coffee-500);
+  outline-offset: -1px;
+}
+
+.new-cat-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.btn-sm {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.menu-error-sm {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+/* ---- Cột thao tác (nút Sửa) ---- */
+.menu-table .col-actions {
+  width: 40px;
+  text-align: right;
+  padding-right: 16px;
+}
+
+.edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-mute);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.menu-table tbody tr:hover .edit-btn {
+  opacity: 1;
+}
+
+.edit-btn:hover {
+  background: var(--coffee-100);
+  color: var(--coffee-700);
+}

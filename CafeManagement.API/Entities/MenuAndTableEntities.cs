@@ -15,10 +15,12 @@ namespace CafeManagement.API.Entities
 
         public ICollection<TableFood> TableFoods { get; set; } = new List<TableFood>();
     }
+
     public class FoodCategory
     {
         [Key]
         public int Id { get; set; }
+
         [Required, MaxLength(150)]
         public string Name { get; set; } = string.Empty;
 
@@ -29,6 +31,7 @@ namespace CafeManagement.API.Entities
     {
         [Key]
         public int Id { get; set; }
+
         [Required, MaxLength(150)]
         public string Name { get; set; } = string.Empty;
 
@@ -36,11 +39,15 @@ namespace CafeManagement.API.Entities
         public decimal Price { get; set; }
 
         [Column("costPrice")]
-        public double CostPrice { get; set; } // Khớp với cột costPrice FLOAT trong SQL
+        public double CostPrice { get; set; }
 
         public int IdCategory { get; set; }
+
         [ForeignKey("IdCategory")]
         public FoodCategory Category { get; set; } = null!;
+
+        [MaxLength(100)]
+        public string ItemType { get; set; } = string.Empty;
 
         public ICollection<Recipe> Recipes { get; set; } = new List<Recipe>();
         public ICollection<BillInfo> BillInfos { get; set; } = new List<BillInfo>();
@@ -67,11 +74,10 @@ namespace CafeManagement.API.Entities
 
         public bool IsActive { get; set; } = true;
 
-        // --- BỔ SUNG 2 DÒNG NÀY ĐỂ HẾT LỖI ---
         public int? IdArea { get; set; }
+
         [ForeignKey("IdArea")]
         public Area? Area { get; set; }
-        // -------------------------------------
 
         public ICollection<Bill> Bills { get; set; } = new List<Bill>();
     }

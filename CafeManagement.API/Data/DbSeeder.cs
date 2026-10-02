@@ -7,7 +7,6 @@ namespace CafeManagement.API.Data
     {
         public static async Task SeedAsync(AppDbContext context)
         {
-            // Tự động tạo CSDL và bộ bảng (nếu chưa tồn tại) theo cấu hình OnModelCreating
             await context.Database.EnsureCreatedAsync();
 
             if (!await context.Permissions.AnyAsync())
