@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Menu from './pages/Menu';
 import POS from './pages/POS';
 import Header from './components/Header';
+import TableManagement from './pages/TableManagement';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -35,6 +36,8 @@ function App() {
         >
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/menu" element={<Menu />} />
+          {/* Đã bổ sung trang Quản lý Phòng/Bàn */}
+          <Route path="/tables" element={<TableManagement />} />
         </Route>
 
         {/* POS toàn màn hình, không dùng Header */}

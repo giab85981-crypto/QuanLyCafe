@@ -30,6 +30,9 @@ namespace CafeManagement.API.Entities
         public int Status { get; set; } = 0; // 0: Chưa thanh toán, 1: Đã thanh toán
         public int Discount { get; set; } = 0;
 
+        // Bổ sung TotalPrice để lưu tổng tiền hóa đơn
+        public decimal TotalPrice { get; set; } = 0;
+
         public int? IdCustomer { get; set; }
         [ForeignKey("IdCustomer")]
         public Customer? Customer { get; set; }
