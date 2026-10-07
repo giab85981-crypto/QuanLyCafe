@@ -81,10 +81,14 @@ namespace CafeManagement.API.Controllers
         [HttpPut("{billId}/guests")]
         public async Task<IActionResult> UpdateGuests(int billId, [FromBody] UpdateGuestCountDto dto)
         {
+            if (dto.GuestCount < 1 || dto.GuestCount > 1000) return BadRequest("Số khách phải từ 1 đến 1000.");
+            await using var tx = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            await new StockReservations(_context).Lock();
             var bill = await _context.Bills.FirstOrDefaultAsync(b => b.Id == billId && b.Status == 0);
             if (bill == null) return NotFound("Không tìm thấy hóa đơn đang phục vụ.");
             bill.GuestCount = dto.GuestCount;
             await _context.SaveChangesAsync();
+            await tx.CommitAsync();
             return Ok(new { bill.GuestCount });
         }
 
@@ -92,6 +96,7 @@ namespace CafeManagement.API.Controllers
         public async Task<IActionResult> SetCustomer(int billId, BillCustomerWrite dto)
         {
             await using var tx = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            await new StockReservations(_context).Lock();
             var bill = await _context.Bills.SingleOrDefaultAsync(b => b.Id == billId && b.Status == 0);
             if (bill == null) return NotFound("Đơn không còn phục vụ.");
             if (dto.IdCustomer.HasValue && !await _context.Customers.AnyAsync(c => c.Id == dto.IdCustomer && c.IsActive)) return BadRequest("Khách đã ngừng hoạt động hoặc không tồn tại.");
@@ -103,6 +108,7 @@ namespace CafeManagement.API.Controllers
             if (HttpContext?.User.Identity?.IsAuthenticated == true && (dto.Discount > 0 || dto.RedeemPoints > 0) && !DynamicAccess.Has(User, "POS_DISCOUNT")) return Forbid();
             if (dto.Discount < 0 || dto.Discount > 100 || dto.GuestCount < 1 || dto.GuestCount > 1000) return BadRequest("Giảm giá hoặc số khách không hợp lệ.");
             if (dto.PaymentMethod != "Cash" && dto.PaymentMethod != "Transfer") return BadRequest("Phương thức thanh toán không hợp lệ.");
+            if (dto.ExpectedTotal.HasValue && (dto.ExpectedTotal < 0 || decimal.Round(dto.ExpectedTotal.Value, 2) != dto.ExpectedTotal)) return BadRequest("Số tiền đối chiếu không hợp lệ.");
             await using var transaction = _context.Database.CurrentTransaction == null ? await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
             await new StockReservations(_context).Lock();
             var bill = await _context.Bills
@@ -113,6 +119,10 @@ namespace CafeManagement.API.Controllers
             if (bill == null) return NotFound("Không tìm thấy hóa đơn cần thanh toán!");
             if (!bill.BillInfos.Any(i => i.Count > 0))
                 return BadRequest("Hóa đơn chưa có món để thanh toán.");
+
+            // Checkout permission must not become a second path to edit order metadata.
+            if (HttpContext?.User.Identity?.IsAuthenticated == true && !DynamicAccess.Has(User, "POS_ORDER")
+                && (dto.IdCustomer != bill.IdCustomer || dto.GuestCount.HasValue && dto.GuestCount != (bill.GuestCount ?? 1))) return Forbid();
 
             try { bill.IdShift = await new ShiftFlow(_context).ActiveId(HttpContext?.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "system", HttpContext?.User.Identity?.IsAuthenticated == true); }
             catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
@@ -132,6 +142,8 @@ namespace CafeManagement.API.Controllers
             bill.Discount = dto.Discount;
             try { await new CafeManagement.API.Services.CustomerLoyalty(_context).Checkout(bill, dto.IdCustomer, dto.RedeemPoints, bill.PaidBy); }
             catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            if (dto.ExpectedTotal.HasValue && dto.ExpectedTotal.Value != bill.TotalPrice)
+                return Conflict(new { code = "BILL_CHANGED", message = "Hóa đơn vừa thay đổi. Hãy kiểm tra lại món và số tiền trước khi thanh toán." });
 
             if (bill.TableFood != null) bill.TableFood.Status = "Trống";
 

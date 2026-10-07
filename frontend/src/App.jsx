@@ -17,6 +17,7 @@ import Reports from './pages/Reports';
 import Permissions from './pages/Permissions';
 import Shifts from './pages/Shifts';
 import AccessSync from './components/AccessSync';
+import ThemeToggle from './components/ThemeToggle';
 import { canOpen, landing, useAccess } from './utils/staffAccess';
 import { useLocation } from 'react-router-dom';
 
@@ -40,6 +41,7 @@ function NoAccessRedirect() { const user = useAccess(); return !localStorage.get
 function App() {
   return (
     <Router>
+      <ThemeToggle />
       <AccessSync />
       <Routes>
         <Route path="/no-access" element={<div style={{padding:60,textAlign:'center'}}><h1>Chưa được cấp quyền chức năng</h1><p>Liên hệ quản trị viên. Quyền mới sẽ tự cập nhật sau vài giây.</p><button onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.assign('/login') }}>Đăng xuất</button><NoAccessRedirect /></div>} />

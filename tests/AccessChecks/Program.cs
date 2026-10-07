@@ -76,6 +76,19 @@ try {
  Check((await worker.GetAsync("Food")).StatusCode==HttpStatusCode.Forbidden,"Group edit applies immediately to assigned account");
  Check((await admin.PutAsJsonAsync($"Access/roles/{custom["id"]}",new {name="Demo limited",permissions=new[]{"MENU_VIEW"},revision=custom["revision"]!.GetValue<string>()})).StatusCode==HttpStatusCode.Conflict,"Stale group edits rejected");
  await DynamicAccess.Seed(db); Check((await DynamicAccess.Effective(db,"access.worker")).Count==0,"Restart seed preserves empty custom group");
+ // Exercise every private route, including writes, through the real authentication pipeline.
+ // Permission denial must happen before an invalid body or a nonexistent ID is processed.
+ using (var anonymous = new HttpClient { BaseAddress = admin.BaseAddress }) {
+  foreach (var type in typeof(CafeManagement.API.Controllers.AuthController).Assembly.GetTypes().Where(t => t.Namespace == "CafeManagement.API.Controllers" && t.Name.EndsWith("Controller") && t.Name is not "AuthController" and not "PublicMenuController"))
+  foreach (var endpoint in type.GetMethods().SelectMany(m => m.GetCustomAttributes(typeof(Microsoft.AspNetCore.Mvc.Routing.HttpMethodAttribute), true).Cast<Microsoft.AspNetCore.Mvc.Routing.HttpMethodAttribute>()))
+  foreach (var verb in endpoint.HttpMethods) {
+   var path = type.Name.Replace("Controller", "") + (string.IsNullOrEmpty(endpoint.Template) ? "" : "/" + System.Text.RegularExpressions.Regex.Replace(endpoint.Template, @"\{[^}]+\}", "999999"));
+   using var deniedRequest = new HttpRequestMessage(new HttpMethod(verb), path) { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
+   using var unsignedRequest = new HttpRequestMessage(new HttpMethod(verb), path) { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
+   Check((await worker.SendAsync(deniedRequest)).StatusCode == HttpStatusCode.Forbidden, $"No-rights account denied {verb} {path}");
+   Check((await anonymous.SendAsync(unsignedRequest)).StatusCode == HttpStatusCode.Unauthorized, $"Anonymous denied {verb} {path}");
+  }
+ }
  var snapshot=await Snapshot(); var adminRole=snapshot["roles"]!.AsArray().OfType<JsonObject>().Single(x=>x["name"]!.GetValue<string>()=="Admin"); var adminUser=snapshot["accounts"]!.AsArray().OfType<JsonObject>().Single(x=>x["userName"]!.GetValue<string>()=="admin");
  Check((await admin.PutAsJsonAsync($"Access/roles/{adminRole["id"]}",new {name="Admin",permissions=Array.Empty<string>(),revision=adminRole["revision"]!.GetValue<string>()})).StatusCode==HttpStatusCode.BadRequest,"Admin group immutable");
  Check((await admin.PutAsJsonAsync("Access/accounts/admin",new {idRole=kitchen.Id,overrides=Array.Empty<object>(),revision=adminUser["revision"]!.GetValue<string>()})).StatusCode==HttpStatusCode.BadRequest,"Self demotion blocked");
@@ -117,6 +130,16 @@ try {
  Check((await worker.PostAsJsonAsync($"Shift/{ownShift}/close",new {countedCash=199000,expectedCash=200000,note=""})).StatusCode == HttpStatusCode.BadRequest,"HTTP close rejects unexplained cash variance");
  Check((await worker.PostAsJsonAsync($"Shift/{ownShift}/close",new {countedCash=200000,expectedCash=200000,note=""})).IsSuccessStatusCode,"Employee closes own shift");
  Check((await worker.PostAsJsonAsync($"Shift/{ownShift}/close",new {countedCash=200000,expectedCash=200000,note=""})).IsSuccessStatusCode,"HTTP close retry remains idempotent");
+ Check((await admin.PutAsJsonAsync("Account/access.worker/status",new {isActive=false})).IsSuccessStatusCode,"Admin locks employee login");
+ Check((await worker.GetAsync("Auth/me")).StatusCode == HttpStatusCode.Unauthorized,"Locked employee token rejected immediately");
+ Check((await admin.PutAsJsonAsync("Account/access.worker/status",new {isActive=true})).IsSuccessStatusCode,"Admin unlocks employee login");
+ Check((await worker.GetAsync("Auth/me")).StatusCode == HttpStatusCode.Unauthorized,"Unlock never revives previously revoked token");
+ response = await worker.PostAsJsonAsync("Auth/login",new {userName="access.worker",passWord="DemoAccess123"}); Check(response.IsSuccessStatusCode,"Unlocked employee signs in again");
+ worker.DefaultRequestHeaders.Authorization=new("Bearer",(await response.Content.ReadFromJsonAsync<JsonObject>())!["token"]!.GetValue<string>());
+ Check((await admin.PutAsJsonAsync("Account/access.worker",new {displayName="Access worker",idRole=cashier.Id,passWord="ResetAccess123"})).IsSuccessStatusCode,"Admin resets employee password");
+ Check((await worker.GetAsync("Auth/me")).StatusCode == HttpStatusCode.Unauthorized,"Password reset rejects already-issued employee token");
+ Check((await worker.PostAsJsonAsync("Auth/login",new {userName="access.worker",passWord="DemoAccess123"})).StatusCode == HttpStatusCode.Unauthorized,"Old password rejected after reset");
+ Check((await worker.PostAsJsonAsync("Auth/login",new {userName="access.worker",passWord="ResetAccess123"})).IsSuccessStatusCode,"Reset password allows new login");
  foreach(var type in typeof(CafeManagement.API.Controllers.AuthController).Assembly.GetTypes().Where(t=>t.Name.EndsWith("Controller") && t.Namespace=="CafeManagement.API.Controllers" && t.Name is not "AuthController" and not "PublicMenuController"))
  foreach(var method in type.GetMethods().Where(m=>m.GetCustomAttributes(typeof(Microsoft.AspNetCore.Mvc.Routing.HttpMethodAttribute),true).Length>0)) Check(DynamicAccess.Required(type.Name.Replace("Controller",""),method.Name,"GET").Length>0,$"Mapped {type.Name}.{method.Name}");
  Console.WriteLine($"{count} access checks passed");

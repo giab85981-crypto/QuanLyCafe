@@ -1120,6 +1120,80 @@ namespace CafeManagement.API.Migrations
                     b.ToTable("Permission");
                 });
 
+            modelBuilder.Entity("CafeManagement.API.Entities.QrOrderRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DecidedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("IdBill")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdTable")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ItemsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("RequestKey")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("TableName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdBill");
+
+                    b.HasIndex("IdTable");
+
+                    b.HasIndex("RequestKey")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("QrOrderRequest");
+                });
+
             modelBuilder.Entity("CafeManagement.API.Entities.Recipe", b =>
                 {
                     b.Property<int>("Id")
@@ -1804,6 +1878,24 @@ namespace CafeManagement.API.Migrations
                     b.Navigation("Food");
 
                     b.Navigation("KitchenOrder");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.QrOrderRequest", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.Bill", "Bill")
+                        .WithMany()
+                        .HasForeignKey("IdBill")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CafeManagement.API.Entities.TableFood", "Table")
+                        .WithMany()
+                        .HasForeignKey("IdTable")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Bill");
+
+                    b.Navigation("Table");
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.Recipe", b =>

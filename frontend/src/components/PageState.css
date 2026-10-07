@@ -1,0 +1,9 @@
+.page-state { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 36px 20px; text-align: center; color:var(--text-mute); }
+.page-state__icon { display: grid; place-items: center; width: 56px; height: 56px; border-radius:50%; background:var(--coffee-100); color:var(--coffee-700); }
+.page-state strong { color:var(--text); font-size: 15px; }
+.page-state p { max-width: 520px; margin: 0; font-size: 13px; line-height: 1.6; }
+.page-state button { padding: 8px 16px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--surface); color:var(--coffee-700); font: inherit; cursor: pointer; }
+.page-state.is-error .page-state__icon { background:var(--theme-bg-fdecec, #fdecec); color:var(--theme-fg-b3261e, #b3261e); }
+.page-state.is-loading svg { animation: page-state-spin 1s linear infinite; }
+@keyframes page-state-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .page-state.is-loading svg { animation: none; } }

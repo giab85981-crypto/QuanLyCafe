@@ -94,6 +94,7 @@ public static class DynamicAccess
     public static string[] Required(string controller, string action, string method) => (controller, action) switch
     {
         ("Access", _) => ["ADMIN_ONLY"],
+        ("QrOrders", "List" or "Decision") => ["POS_ORDER"],
         ("Dashboard", _) => ["DASHBOARD_VIEW"], ("Report", _) => ["REPORT_VIEW"],
         ("Kitchen", "Pending") => ["KITCHEN_VIEW"], ("Kitchen", "Status") => ["KITCHEN_UPDATE"], ("Kitchen", "Send") => ["POS_SEND"],
         ("Bill", "GetActiveBillByTable") => ["POS_VIEW"], ("Bill", "AddItemToBill" or "UpdateGuests" or "SetCustomer") => ["POS_ORDER"],

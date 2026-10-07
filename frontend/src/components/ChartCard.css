@@ -1,7 +1,7 @@
 .chart-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius-lg);
   padding: 20px;
   box-shadow: var(--shadow-card);
   display: flex;
@@ -28,56 +28,56 @@
 }
 
 .chart-card__info {
-  color: var(--text-mute);
+  color:var(--text-mute);
   font-size: 12px;
   cursor: help;
 }
 
 .chart-card__select {
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  border:1px solid var(--line);
+  border-radius:999px;
   padding: 6px 12px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--coffee-900);
-  background: var(--surface);
+  color:var(--coffee-900);
+  background:var(--surface);
 }
 
 .chart-card__value {
   font-family: 'Manrope', sans-serif;
   font-size: 26px;
   font-weight: 800;
-  color: var(--coffee-900);
+  color:var(--coffee-900);
   margin-top: 12px;
 }
 
 .chart-card__value-suffix {
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-mute);
+  color:var(--text-mute);
 }
 
 .chart-card__tabs {
   display: flex;
   gap: 18px;
   margin: 14px 0 10px;
-  border-bottom: 1px solid var(--line);
+  border-bottom:1px solid var(--line);
 }
 
 .chart-card__tab {
-  border: none;
-  background: transparent;
+  border:none;
+  background:transparent;
   padding: 6px 2px 10px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-mute);
-  border-bottom: 2px solid transparent;
+  color:var(--text-mute);
+  border-bottom:2px solid transparent;
   cursor: pointer;
 }
 
 .chart-card__tab.is-active {
-  color: var(--coffee-700);
-  border-bottom-color: var(--coffee-700);
+  color:var(--coffee-700);
+  border-bottom-color:var(--coffee-700);
 }
 
 .rev-chart {
@@ -105,8 +105,8 @@
 .rev-chart__bar {
   width: 100%;
   min-height: 2px;
-  background: var(--coffee-700);
-  border-radius: 3px 3px 0 0;
+  background:var(--coffee-700);
+  border-radius:3px 3px 0 0;
   transition: opacity 0.15s ease;
 }
 
@@ -118,7 +118,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  color: var(--text-mute);
+  color:var(--text-mute);
   margin-top: 6px;
 }
 
@@ -129,7 +129,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: var(--text-mute);
+  color:var(--text-mute);
   font-size: 13px;
   min-height: 160px;
 }

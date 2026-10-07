@@ -1,3 +1,4 @@
+import { errMsg as err } from '../api/errMsg'
 import { can, useAccess } from '../utils/staffAccess'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -10,7 +11,6 @@ import './Customers.css'
 const money = n => Number(n || 0).toLocaleString('vi-VN')
 const date = d => d ? new Date(d).toLocaleDateString('vi-VN') : '—'
 const time = d => d ? new Date(d).toLocaleString('vi-VN') : '—'
-const err = e => e.response?.status >= 500 ? 'Máy chủ gặp lỗi. Kiểm tra backend/LocalDB rồi thử lại.' : e.response?.status === 401 ? 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.' : typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || e.message || 'Thao tác thất bại.'
 const blank = () => ({ name: '', phone: '', email: '', address: '', note: '', gender: '', birthday: '', idGroup: '' })
 const statuses = ['Đang phục vụ', 'Đã thanh toán', 'Đã đóng / gộp', 'Đã hoàn tiền']
 const headers = ['Tên khách hàng', 'Điện thoại', 'Email', 'Ngày sinh', 'Giới tính', 'Địa chỉ', 'Nhóm', 'Ghi chú']

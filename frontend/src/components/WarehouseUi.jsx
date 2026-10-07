@@ -1,3 +1,3 @@
-import { Package } from 'lucide-react'
-export function WarehouseTable({ headers, children, empty }) { return <div className="mc-table-wrap"><table className="mc-table"><thead><tr>{headers.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table>{empty && <div className="mc-empty"><Package size={36}/><h3>Chưa có dữ liệu phù hợp</h3><p>Thử thay đổi bộ lọc hoặc tạo phiếu mới.</p></div>}</div> }
+import PageState from './PageState'
+export function WarehouseTable({ headers, children, empty, loading, error, onRetry, emptyTitle, emptyDescription }) { if (loading || error) return <PageState loading={loading} error={error} onRetry={onRetry} />; return <div className="mc-table-wrap"><table className="mc-table"><thead><tr>{headers.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{children}</tbody></table>{empty && <PageState title={emptyTitle} description={emptyDescription} />}</div> }
 export const Method = ({ value, onChange }) => <select aria-label="Phương thức thanh toán" value={value} onChange={e => onChange(e.target.value)}><option value="Cash">Tiền mặt</option><option value="Transfer">Chuyển khoản</option></select>

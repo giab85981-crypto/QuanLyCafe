@@ -70,6 +70,11 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddControllers(options => options.Filters.Add<CafeManagement.API.Services.StaffAccessFilter>());
+builder.Services.AddRateLimiter(options => {
+    options.RejectionStatusCode = 429;
+    options.AddPolicy("qr-submit", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        $"{context.Connection.RemoteIpAddress}:{context.Request.RouteValues["tableId"]}", _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
 builder.Services.AddEndpointsApiExplorer();
 
 // 4. Cấu hình SwaggerGen hỗ trợ gửi Bearer Token
@@ -122,6 +127,7 @@ app.UseHttpsRedirection();
 app.UseCors("AllowReactApp");
 
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();

@@ -1,3 +1,4 @@
+import { errMsg } from '../api/errMsg'
 import { useEffect, useState } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Utensils, Sandwich, CupSoda, RefreshCw } from 'lucide-react'
@@ -26,7 +27,7 @@ function Dashboard() {
       .then((r) => { if (!controller.signal.aborted) setData(r.data) })
       .catch((e) => {
         if (controller.signal.aborted) return
-        setError(e.response?.status === 401 ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' : 'Không tải được Dashboard. Kiểm tra kết nối API và cập nhật cơ sở dữ liệu rồi thử lại.')
+        setError(errMsg(e, 'Không tải được dữ liệu kinh doanh. Vui lòng thử lại.'))
       })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()

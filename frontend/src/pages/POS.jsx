@@ -1,3 +1,5 @@
+import QrOrderInbox from '../components/QrOrderInbox'
+import { errMsg } from '../api/errMsg'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axiosClient from '../api/axiosClient'
@@ -56,6 +58,8 @@ function POS() {
     if (!can('POS_ORDER')) setSelection(null)
     if (!can('POS_CANCEL')) setCancelItem(null)
     if (!can('POS_TRANSFER')) setTransfer(false)
+    if (!can('KITCHEN_VIEW')) setKitchen(null)
+    if (!can('POS_DISCOUNT')) { setDiscount(0); setRedeemPoints(0) }
   }, [user.roleName, JSON.stringify(user.permissions)])
 
   const loadTables = useCallback(
@@ -72,8 +76,9 @@ function POS() {
       .then((r) => {
         if (r.data.status !== 0) throw new Error("Đơn đã thanh toán hoặc đóng. Vào Đơn hàng để xem lịch sử.")
         setBill(r.data)
-        setDiscount(r.data.discount || 0)
+        setDiscount(can('POS_DISCOUNT') ? r.data.discount || 0 : 0)
         setGuestCount(r.data.guestCount ?? 1)
+        return r.data
       })
       .catch(e => { if (e.response?.status === 404) { setBill(null); setDiscount(0); setGuestCount(1) } else throw e })
   }, [])
@@ -110,7 +115,7 @@ function POS() {
       await fn()
       if (okMsg) setMsg(okMsg)
     } catch (e) {
-      setMsg(typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || e.message || 'Thao tác thất bại.')
+      setMsg(errMsg(e))
     } finally {
       setBusy(false)
     }
@@ -143,7 +148,12 @@ function POS() {
   })
   const checkout = () =>
     run(async () => {
-      await axiosClient.post(`/Bill/checkout/${bill.idBill}`, { discount, guestCount, paymentMethod, idCustomer: bill.customer?.id ?? null, redeemPoints: Math.min(redeemPoints, maxRedeem) })
+      try {
+        await axiosClient.post(`/Bill/checkout/${bill.idBill}`, { discount, guestCount, paymentMethod, idCustomer: bill.customer?.id ?? null, redeemPoints: Math.min(redeemPoints, maxRedeem), expectedTotal: total })
+      } catch (e) {
+        if (e.response?.data?.code === 'BILL_CHANGED') { setPaymentOpen(false); await loadBill(tableId, takeawayId) }
+        throw e
+      }
       setBill(null); setPaymentOpen(false); setView('tables')
       if (takeawayId) { setTakeawayId(null); navigate("/pos", { replace: true }) }
       await Promise.all([loadTables(), loadFoods()])
@@ -175,7 +185,8 @@ function POS() {
   const openPayment = async () => {
     if (!can('POS_CHECKOUT') || !bill?.items.length || busy) return
     try {
-      const r = await axiosClient.get('/Shift/current'); setShift(r.data.shift)
+      const [r, latest] = await Promise.all([axiosClient.get('/Shift/current'), loadBill(tableId, takeawayId)]); setShift(r.data.shift)
+      if (!latest?.items.length || !can('POS_CHECKOUT')) return
       if (!r.data.shift) { setMsg(can('SHIFT_SELF') ? 'Bạn chưa mở ca. Bấm Ca làm việc ở thanh trên để mở ca trước khi thanh toán.' : 'Bạn chưa có ca mở. Quản trị viên cần cấp quyền mở/chốt ca cá nhân để bạn bắt đầu ca.'); return }
       setMsg(''); setPaymentOpen(true)
     } catch { setMsg('Không kiểm tra được ca hiện tại. Vui lòng thử lại.') }
@@ -198,7 +209,7 @@ function POS() {
           <button role="tab" aria-selected={view === 'menu'} className={view === 'menu' ? 'is-active' : ''} onClick={() => setView('menu')}><Utensils size={17}/> Thực đơn</button>
         </div>
         <label className="pos__search-wrap"><Search size={18}/><input ref={searchRef} className="pos__search" aria-label="Tìm món" placeholder="Tìm món (F3)" value={keyword} onChange={e => { setKeyword(e.target.value); setView('menu') }}/></label>
-        <div className="pos__bar-right"><span className="pos__user">{user.displayName || 'Thu ngân'}<small>{user.roleName === 'Admin' ? 'Quản trị viên' : user.roleName === 'Cashier' ? 'Thu ngân' : user.roleName}</small></span>
+        <div className="pos__bar-right"><QrOrderInbox onProcessed={async id => { await Promise.all([loadTables(), loadFoods(), id === tableId ? loadBill(tableId, takeawayId) : Promise.resolve()]) }} /><span className="pos__user">{user.displayName || 'Thu ngân'}<small>{user.roleName === 'Admin' ? 'Quản trị viên' : user.roleName === 'Cashier' ? 'Thu ngân' : user.roleName}</small></span>
           {canOpen('/shifts', user) ? <button className="pos__shift-status" onClick={() => navigate('/shifts')}>{shift ? `CA${String(shift.id).padStart(6,'0')}` : 'Mở ca'} · Ca làm việc</button> : can('POS_CHECKOUT') && <span className="pos__shift-status">{shift ? `CA${String(shift.id).padStart(6,'0')}` : 'Chưa mở ca'}</span>}
           <button className="pos__menu-toggle" aria-label="Menu thu ngân" aria-expanded={menuOpen} onClick={() => setMenuOpen(v => !v)}><Menu size={21}/></button>
           {menuOpen && <><button className="pos__menu-dismiss" aria-label="Đóng menu thu ngân" onClick={() => setMenuOpen(false)}/><div className="pos__user-menu">
@@ -267,7 +278,7 @@ function POS() {
                 max="100"
                 disabled={!can('POS_DISCOUNT')}
                 value={discount}
-                onChange={(e) => setDiscount(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                onChange={(e) => setDiscount(Math.min(100, Math.max(0, Math.trunc(Number(e.target.value)) || 0)))}
               />
             </div>
             {bill?.customer && <><div><label htmlFor="redeem-points">Đổi điểm (tối đa {maxRedeem})</label><input id="redeem-points" type="number" min="0" max={maxRedeem} disabled={!can('POS_DISCOUNT') || busy} value={Math.min(redeemPoints, maxRedeem)} onChange={e => setRedeemPoints(Math.max(0, Math.min(maxRedeem, Math.trunc(Number(e.target.value)) || 0)))} /></div><div><span>Giảm từ điểm</span><span>{money(Math.min(redeemPoints, maxRedeem) * 100)} đ</span></div><p className="pos__loyalty-note">Tích thêm {earnedPoints} điểm sau thanh toán · 1 điểm = 100đ.{bill.customer.points < 0 ? ' Điểm âm được bù bằng lần mua này.' : ''}</p></>}

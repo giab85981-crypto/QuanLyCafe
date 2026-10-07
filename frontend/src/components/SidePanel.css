@@ -1,7 +1,7 @@
 .panel-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius-lg);
   box-shadow: var(--shadow-card);
 }
 
@@ -16,16 +16,16 @@
   align-items: center;
   gap: 12px;
   width: 100%;
-  border: none;
-  background: transparent;
+  border:none;
+  background:transparent;
   padding: 12px;
-  border-radius: var(--radius-md);
+  border-radius:var(--radius-md);
   cursor: pointer;
   text-align: left;
 }
 
 .quick-links__item:hover {
-  background: var(--coffee-100);
+  background:var(--coffee-100);
 }
 
 .quick-links__icon {
@@ -35,8 +35,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--coffee-100);
-  border-radius: 50%;
+  background:var(--coffee-100);
+  border-radius:50%;
   flex-shrink: 0;
 }
 
@@ -50,47 +50,47 @@
 .quick-links__title {
   font-size: 14px;
   font-weight: 700;
-  color: var(--coffee-900);
+  color:var(--coffee-900);
 }
 
 .quick-links__subtitle {
   font-size: 12px;
-  color: var(--text-mute);
+  color:var(--text-mute);
 }
 
 .quick-links__chevron {
-  color: var(--text-mute);
+  color:var(--text-mute);
   font-size: 16px;
 }
 
 .promo-card {
   padding: 16px;
   position: relative;
-  background: linear-gradient(135deg, var(--coffee-100), var(--surface));
+  background:linear-gradient(135deg, var(--coffee-100), var(--surface));
 }
 
 .promo-card__badge {
   position: absolute;
   top: 14px;
   right: 16px;
-  background: #e0533d;
-  color: #fff;
+  background:#e0533d;
+  color:#fff;
   font-size: 11px;
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius:999px;
 }
 
 .promo-card h4 {
   font-size: 14px;
   font-weight: 700;
   margin-bottom: 6px;
-  color: var(--coffee-900);
+  color:var(--coffee-900);
 }
 
 .promo-card p {
   font-size: 13px;
-  color: var(--text-mute);
+  color:var(--text-mute);
   margin: 0 0 10px;
   max-width: 85%;
 }
@@ -98,7 +98,7 @@
 .promo-card__link {
   font-size: 13px;
   font-weight: 700;
-  color: var(--coffee-700);
+  color:var(--coffee-700);
   text-decoration: none;
 }
 
@@ -110,7 +110,7 @@
   font-size: 14px;
   font-weight: 700;
   margin-bottom: 12px;
-  color: var(--coffee-900);
+  color:var(--coffee-900);
 }
 
 .activity-card__list {
@@ -131,8 +131,8 @@
 .activity-card__icon {
   width: 30px;
   height: 30px;
-  border-radius: 50%;
-  background: var(--coffee-100);
+  border-radius:50%;
+  background:var(--coffee-100);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -145,11 +145,11 @@
   flex-direction: column;
   gap: 4px;
   font-size: 13px;
-  color: var(--text);
+  color:var(--text);
   line-height: 1.4;
 }
 
 .activity-card__time {
   font-size: 12px;
-  color: var(--text-mute);
+  color:var(--text-mute);
 }

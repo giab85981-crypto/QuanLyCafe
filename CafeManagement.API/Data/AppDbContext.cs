@@ -8,6 +8,7 @@ namespace CafeManagement.API.Data
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
         public DbSet<IngredientGroup> IngredientGroups { get; set; }
+        public DbSet<QrOrderRequest> QrOrderRequests { get; set; }
         public DbSet<IngredientUnit> IngredientUnits { get; set; }
         public DbSet<StockLot> StockLots { get; set; }
         public DbSet<WarehouseDocument> WarehouseDocuments { get; set; }
@@ -47,6 +48,10 @@ namespace CafeManagement.API.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<QrOrderRequest>().HasIndex(r => r.RequestKey).IsUnique();
+            modelBuilder.Entity<QrOrderRequest>().HasIndex(r => new { r.Status, r.CreatedAt });
+            modelBuilder.Entity<QrOrderRequest>().HasOne(r => r.Table).WithMany().HasForeignKey(r => r.IdTable).OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<QrOrderRequest>().HasOne(r => r.Bill).WithMany().HasForeignKey(r => r.IdBill).OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<CashierShift>().HasOne(s => s.Account).WithMany().HasForeignKey(s => s.UserName).OnDelete(DeleteBehavior.Restrict);
             modelBuilder.Entity<CashierShift>().HasIndex(s => s.UserName).IsUnique().HasFilter("[ClosedAt] IS NULL");
             modelBuilder.Entity<CashierShift>().HasIndex(s => s.RequestKey).IsUnique();

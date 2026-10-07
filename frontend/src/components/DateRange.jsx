@@ -41,9 +41,9 @@ function DateRange({ from, to, onChange }) {
           {label}
         </button>
       ))}
-      <input className="pg-input" type="date" value={from} max={to} onChange={(e) => e.target.value && onChange(e.target.value, to)} />
+      <input className="pg-input" type="date" aria-label="Từ ngày" value={from} max={to} onChange={(e) => e.target.value && onChange(e.target.value, to)} />
       <span className="pg-mute">đến</span>
-      <input className="pg-input" type="date" value={to} min={from} onChange={(e) => e.target.value && onChange(from, e.target.value)} />
+      <input className="pg-input" type="date" aria-label="Đến ngày" value={to} min={from} onChange={(e) => e.target.value && onChange(from, e.target.value)} />
     </div>
   )
 }

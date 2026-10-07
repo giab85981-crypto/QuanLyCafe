@@ -1,3 +1,4 @@
+import { errMsg as failure } from '../api/errMsg'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChefHat, Clock3, Flame, CircleCheck, RefreshCw, Search, LayoutGrid, List, ShoppingBag, Armchair, LogOut, ArrowLeft, StickyNote, ArrowRight, Coffee } from 'lucide-react'
@@ -12,7 +13,6 @@ const stages = [
 ]
 const code = id => `HD${String(id).padStart(6, '0')}`
 const normalize = value => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').toLowerCase()
-const failure = e => typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Không kết nối được bếp. Kiểm tra backend rồi thử lại.'
 const portions = orders => orders.reduce((sum, order) => sum + order.details.reduce((n, d) => n + d.count, 0), 0)
 const elapsed = (created, now) => {
   const minutes = Math.max(0, Math.floor((now - new Date(created).getTime()) / 60000))

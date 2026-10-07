@@ -12,7 +12,7 @@ public class OrderFlow(AppDbContext db)
     public async Task<int> Add(AddFoodToBillDto dto, string user = "system")
     {
         if (dto.Count < 1 || dto.Count > 1000) throw new InvalidOperationException("Số lượng phải từ 1 đến 1000.");
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        await using var tx = db.Database.CurrentTransaction == null ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable) : null;
         await new StockReservations(db).Lock();
         Bill? selectedBill = null; TableFood? table = null;
         if (dto.IdBill.HasValue) {
@@ -45,6 +45,8 @@ public class OrderFlow(AppDbContext db)
             recipes.AddRange(recipe.Select(r => new IngredientPortion(r.IdIngredient, r.Amount * choice.Count)));
             labels.Add($"{topping.Name} ×{choice.Count}"); selected.Add(new { topping.Id, topping.Name, topping.Price, choice.Count });
         }
+        if (dto.Note?.Length > 300) throw new InvalidOperationException("Ghi chú tối đa 300 ký tự.");
+        if (!string.IsNullOrWhiteSpace(dto.Note)) labels.Add(dto.Note.Trim());
         var ingredientsJson = JsonSerializer.Serialize(recipes.GroupBy(r => r.IdIngredient).Select(g => new IngredientPortion(g.Key, g.Sum(r => r.Amount))).OrderBy(r => r.IdIngredient));
         await new StockReservations(db).Check(recipes.GroupBy(r => r.IdIngredient).ToDictionary(g => g.Key, g => g.Sum(r => r.Amount) * dto.Count));
         var optionsJson = JsonSerializer.Serialize(selected); var label = string.Join(" · ", labels);
@@ -53,7 +55,7 @@ public class OrderFlow(AppDbContext db)
         var line = bill.BillInfos.FirstOrDefault(i => i.IdFood == food.Id && i.IdVariant == variant?.Id && i.UnitPrice == price && i.CostPrice == cost && i.OptionsJson == optionsJson && i.IngredientsJson == ingredientsJson && i.OptionLabel == label);
         if (line == null) bill.BillInfos.Add(new BillInfo { Food = food, FoodNameSnapshot = food.Name, IdVariant = variant?.Id, Count = dto.Count, UnitPrice = price, CostPrice = cost, OptionLabel = label, OptionsJson = optionsJson, IngredientsJson = ingredientsJson });
         else { if (line.Count + dto.Count > 1000) throw new InvalidOperationException("Một dòng tối đa 1000 phần."); line.Count += dto.Count; }
-        if (table != null) table.Status = "Có người"; await db.SaveChangesAsync(); await tx.CommitAsync(); return bill.Id;
+        if (table != null) table.Status = "Có người"; await db.SaveChangesAsync(); if (tx != null) await tx.CommitAsync(); return bill.Id;
     }
     public async Task<int?> Send(int billId, string user = "system")
     {

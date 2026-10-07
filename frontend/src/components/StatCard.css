@@ -1,25 +1,25 @@
 .stat-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-left: 4px solid transparent;
-  border-radius: var(--radius-lg);
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-left:4px solid transparent;
+  border-radius:var(--radius-lg);
   padding: 18px 20px;
   box-shadow: var(--shadow-card);
 }
 
 .stat-card--blue {
-  border-left-color: var(--coffee-700);
-  background: linear-gradient(180deg, var(--coffee-100) 0%, var(--surface) 55%);
+  border-left-color:var(--coffee-700);
+  background:linear-gradient(180deg, var(--coffee-100) 0%, var(--surface) 55%);
 }
 
 .stat-card--green {
-  border-left-color: var(--green-600);
-  background: linear-gradient(180deg, var(--green-100) 0%, var(--surface) 55%);
+  border-left-color:var(--green-600);
+  background:linear-gradient(180deg, var(--green-100) 0%, var(--surface) 55%);
 }
 
 .stat-card--amber {
-  border-left-color: var(--amber-500);
-  background: linear-gradient(180deg, var(--amber-100) 0%, var(--surface) 55%);
+  border-left-color:var(--amber-500);
+  background:linear-gradient(180deg, var(--amber-100) 0%, var(--surface) 55%);
 }
 
 .stat-card__head {
@@ -32,12 +32,12 @@
 .stat-card__title {
   font-weight: 700;
   font-size: 15px;
-  color: var(--coffee-900);
+  color:var(--coffee-900);
 }
 
 .stat-card__badge {
   font-size: 12px;
-  color: var(--text-mute);
+  color:var(--text-mute);
   display: flex;
   align-items: center;
   gap: 3px;
@@ -47,13 +47,13 @@
   font-family: 'Manrope', sans-serif;
   font-size: 32px;
   font-weight: 800;
-  color: var(--coffee-900);
+  color:var(--coffee-900);
   margin: 10px 0 4px;
 }
 
 .stat-card__subtitle {
   font-size: 13px;
-  color: var(--text-mute);
+  color:var(--text-mute);
   margin-bottom: 14px;
   min-height: 18px;
 }
@@ -63,7 +63,7 @@
   flex-direction: column;
   gap: 8px;
   padding-top: 10px;
-  border-top: 1px solid var(--line);
+  border-top:1px solid var(--line);
 }
 
 .stat-card__row {
@@ -71,10 +71,10 @@
   align-items: center;
   justify-content: space-between;
   font-size: 13px;
-  color: var(--text-mute);
+  color:var(--text-mute);
 }
 
 .stat-card__row-value {
   font-weight: 700;
-  color: var(--coffee-900);
+  color:var(--coffee-900);
 }

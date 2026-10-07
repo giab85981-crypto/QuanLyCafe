@@ -75,3 +75,8 @@ button {
   border-radius: 8px;
 }
 [hidden] { display: none !important; }
+
+/* Shared keyboard and disabled states across management, POS and kitchen. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible { outline: 2px solid var(--coffee-500); outline-offset: 3px; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+:where(.pg-error, .wh-alert, .mc-notice, .wh-notice, .orders-error, .customers-error) { overflow-wrap: anywhere; line-height: 1.5; }

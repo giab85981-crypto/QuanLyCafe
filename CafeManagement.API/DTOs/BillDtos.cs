@@ -9,6 +9,7 @@ namespace CafeManagement.API.DTOs
 
     public class AddFoodToBillDto
     {
+        [System.ComponentModel.DataAnnotations.MaxLength(300)] public string Note { get; set; } = "";
         public int? IdBill { get; set; }
         public int? IdVariant { get; set; }
         public List<ToppingSelectionDto> Toppings { get; set; } = new();
@@ -19,6 +20,7 @@ namespace CafeManagement.API.DTOs
 
     public class CheckoutDto
     {
+        public decimal? ExpectedTotal { get; set; }
         public string PaymentMethod { get; set; } = "Cash";
         [System.ComponentModel.DataAnnotations.Range(0, 100)]
         public int Discount { get; set; }
