@@ -1,4 +1,4 @@
-﻿using CafeManagement.API.Data;
+using CafeManagement.API.Data;
 using CafeManagement.API.DTOs;
 using CafeManagement.API.Entities;
 using Microsoft.AspNetCore.Mvc;
@@ -34,19 +34,30 @@ namespace CafeManagement.API.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateFoodCategoryDto dto)
         {
-            var category = new FoodCategory { Name = dto.Name };
+            var name = dto.Name.Trim();
+            if (name.Length == 0 || name.Length > 100 || await _context.FoodCategories.AnyAsync(c => c.Name == name)) return BadRequest("Tên nhóm trống, quá dài hoặc đã tồn tại.");
+            var category = new FoodCategory { Name = name };
             _context.FoodCategories.Add(category);
             await _context.SaveChangesAsync();
 
             return Ok(new FoodCategoryDto { Id = category.Id, Name = category.Name });
         }
 
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Rename(int id, CreateFoodCategoryDto dto)
+        {
+            var category = await _context.FoodCategories.FindAsync(id); if (category == null) return NotFound();
+            var name = dto.Name.Trim();
+            if (name.Length == 0 || name.Length > 100 || await _context.FoodCategories.AnyAsync(c => c.Id != id && c.Name == name)) return BadRequest("Tên nhóm không hợp lệ hoặc trùng.");
+            category.Name = name; await _context.SaveChangesAsync(); return Ok();
+        }
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
             var category = await _context.FoodCategories.FindAsync(id);
             if (category == null) return NotFound("Không tìm thấy danh mục!");
 
+            if (await _context.Foods.AnyAsync(f => f.IdCategory == id)) return BadRequest("Nhóm đang có món, hãy chuyển món sang nhóm khác trước.");
             _context.FoodCategories.Remove(category);
             await _context.SaveChangesAsync();
             return Ok(new { message = "Xóa danh mục thành công!" });

@@ -1,4 +1,4 @@
-﻿using CafeManagement.API.Data;
+using CafeManagement.API.Data;
 using CafeManagement.API.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,32 +22,39 @@ namespace CafeManagement.API.Controllers
             _config = config;
         }
 
+        [Microsoft.AspNetCore.Authorization.Authorize, HttpGet("me")]
+        public async Task<IActionResult> Me()
+        {
+            var username = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var account = await _context.Accounts.AsNoTracking().Include(a => a.Role).SingleOrDefaultAsync(a => a.UserName == username);
+            if (account == null || !account.IsActive) return Unauthorized();
+            return Ok(new { account.UserName, account.DisplayName, RoleName = account.Role!.Name, Permissions = await CafeManagement.API.Services.DynamicAccess.Effective(_context, account.UserName) });
+        }
+
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
         {
             // 1. Tìm tài khoản trong CSDL
             var account = await _context.Accounts
                 .Include(a => a.Role)
-                .ThenInclude(r => r.RolePermissions)
+                .ThenInclude(r => r!.RolePermissions)
                 .ThenInclude(rp => rp.Permission)
                 .FirstOrDefaultAsync(a => a.UserName == request.UserName);
 
-            if (account == null)
+            if (account == null || !account.IsActive || account.Role == null || string.IsNullOrEmpty(request.PassWord) || Encoding.UTF8.GetByteCount(request.PassWord) > 72)
             {
-                return BadRequest(new { message = "Tài khoản hoặc mật khẩu không chính xác!" });
+                return Unauthorized(new { message = "Tài khoản bị khóa hoặc thông tin đăng nhập không chính xác!" });
             }
 
             // 2. Kiểm tra mật khẩu mã hóa BCrypt
             bool isValidPassword = BCrypt.Net.BCrypt.Verify(request.PassWord, account.PassWord);
             if (!isValidPassword)
             {
-                return BadRequest(new { message = "Tài khoản hoặc mật khẩu không chính xác!" });
+                return Unauthorized(new { message = "Tài khoản bị khóa hoặc thông tin đăng nhập không chính xác!" });
             }
 
             // 3. Lấy danh sách mã quyền (Permission Codes)
-            var permissions = account.Role.RolePermissions
-                .Select(rp => rp.Permission.Code)
-                .ToList();
+            var permissions = (await CafeManagement.API.Services.DynamicAccess.Effective(_context, account.UserName)).OrderBy(x => x).ToList();
 
             // 4. Tạo JWT Token
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -56,6 +63,7 @@ namespace CafeManagement.API.Controllers
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, account.UserName),
+                new Claim("SecurityVersion", account.SecurityVersion.ToString()),
                 new Claim(ClaimTypes.Name, account.DisplayName),
                 new Claim(ClaimTypes.Role, account.Role.Name)
             };

@@ -1,6 +1,13 @@
 import { useEffect } from 'react'
+import './Modal.css'
 
 function Modal({ title, onClose, children, footer, width = 460 }) {
+  useEffect(() => {
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previous }
+  }, [])
+
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
     document.addEventListener('keydown', onKey)

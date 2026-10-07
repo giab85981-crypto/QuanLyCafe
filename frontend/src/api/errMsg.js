@@ -1,0 +1,1 @@
+export const errMsg = (e, fallback = 'Thao tác thất bại.') => e.response?.status === 403 ? 'Bạn không có quyền thực hiện thao tác này.' : typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || Object.values(e.response?.data?.errors || {}).flat().join(' ') || e.message || fallback

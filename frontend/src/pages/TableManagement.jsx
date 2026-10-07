@@ -1,345 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import './TableManagement.css';
-
-function TableManagement() {
-  const token = localStorage.getItem('token');
-  
-  // State Dữ liệu
-  const [areas, setAreas] = useState([]);
-  const [tables, setTables] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  // State Bộ lọc
-  const [selectedArea, setSelectedArea] = useState(null); // null = Tất cả
-  const [statusFilter, setStatusFilter] = useState('Tất cả');
-  const [search, setSearch] = useState('');
-
-  // State Modals
-  const [showTableModal, setShowTableModal] = useState(false);
-  const [showAreaModal, setShowAreaModal] = useState(false);
-
-  // Form States
-  const [newAreaName, setNewAreaName] = useState('');
-  const [newTable, setNewTable] = useState({
-    name: '',
-    seats: 4,
-    note: '',
-    sortOrder: 0,
-    idArea: ''
-  });
-
-  // 1. Gọi API lấy danh sách Khu vực (/api/TableFood/areas)
-  const fetchAreas = async () => {
-    try {
-      const res = await fetch('https://localhost:7053/api/TableFood/areas', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAreas(data);
-      }
-    } catch (err) {
-      console.error('Lỗi fetch areas:', err);
-    }
-  };
-
-  // 2. Gọi API lấy danh sách Phòng/Bàn (/api/TableFood)
-  const fetchTables = async () => {
-    setLoading(true);
-    try {
-      let url = `https://localhost:7053/api/TableFood?search=${search}`;
-      if (selectedArea) url += `&areaId=${selectedArea}`;
-      if (statusFilter !== 'Tất cả') url += `&status=${statusFilter}`;
-
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTables(data);
-      }
-    } catch (err) {
-      console.error('Lỗi fetch tables:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAreas();
-  }, []);
-
-  useEffect(() => {
-    fetchTables();
-  }, [selectedArea, statusFilter, search]);
-
-  // 3. Tạo Khu vực mới (POST /api/TableFood/areas)
-  const handleCreateArea = async (e) => {
-    e.preventDefault();
-    if (!newAreaName.trim()) return;
-
-    const res = await fetch('https://localhost:7053/api/TableFood/areas', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ name: newAreaName })
-    });
-
-    if (res.ok) {
-      setNewAreaName('');
-      setShowAreaModal(false);
-      fetchAreas();
-    }
-  };
-
-  // 4. Tạo Bàn mới (POST /api/TableFood)
-  const handleCreateTable = async (e) => {
-    e.preventDefault();
-    if (!newTable.name.trim()) return;
-
-    const res = await fetch('https://localhost:7053/api/TableFood', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        ...newTable,
-        idArea: newTable.idArea ? parseInt(newTable.idArea) : null
-      })
-    });
-
-    if (res.ok) {
-      setNewTable({ name: '', seats: 4, note: '', sortOrder: 0, idArea: '' });
-      setShowTableModal(false);
-      fetchTables();
-      fetchAreas();
-    }
-  };
-
-  // 5. Xóa Bàn (DELETE /api/TableFood/{id})
-  const handleDeleteTable = async (id) => {
-    if (!window.confirm('Bạn có chắc muốn xóa bàn này?')) return;
-    const res = await fetch(`https://localhost:7053/api/TableFood/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    if (res.ok) {
-      fetchTables();
-      fetchAreas();
-    }
-  };
-
-  return (
-    <div className="table-page">
-      {/* CỘT BÊN TRÁI: KHU VỰC & TRẠNG THÁI */}
-      <div className="table-page__sidebar">
-        <div className="sidebar-group">
-          <div className="sidebar-group__header">
-            <h3>Khu vực</h3>
-            <button className="btn-link" onClick={() => setShowAreaModal(true)}>+ Tạo mới</button>
-          </div>
-          <ul className="filter-list">
-            <li 
-              className={selectedArea === null ? 'active' : ''} 
-              onClick={() => setSelectedArea(null)}
-            >
-              <input type="radio" checked={selectedArea === null} readOnly /> Tất cả
-            </li>
-            {areas.map(a => (
-              <li 
-                key={a.id} 
-                className={selectedArea === a.id ? 'active' : ''} 
-                onClick={() => setSelectedArea(a.id)}
-              >
-                <input type="radio" checked={selectedArea === a.id} readOnly /> 
-                {a.name} <span className="badge">{a.tableCount}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="sidebar-group" style={{ marginTop: '24px' }}>
-          <h3>Trạng thái</h3>
-          <ul className="filter-list">
-            {['Tất cả', 'Trống', 'Có người', 'Ngừng hoạt động'].map(st => (
-              <li 
-                key={st} 
-                className={statusFilter === st ? 'active' : ''} 
-                onClick={() => setStatusFilter(st)}
-              >
-                <input type="radio" checked={statusFilter === st} readOnly /> {st}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      {/* NỘI DUNG CHÍNH BÊN PHẢI */}
-      <div className="table-page__content">
-        {/* HEADER TOOLBAR */}
-        <div className="table-page__toolbar">
-          <div className="search-box">
-            <span className="search-icon">🔍</span>
-            <input 
-              type="text" 
-              placeholder="Theo tên phòng bàn, số ghế..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="action-buttons">
-            <button className="btn-primary" onClick={() => setShowTableModal(true)}>
-              + Thêm phòng/bàn
-            </button>
-            <button className="btn-secondary">📥 Import</button>
-            <button className="btn-secondary">📤 Xuất file</button>
-          </div>
-        </div>
-
-        {/* BẢNG DỮ LIỆU HOẶC EMPTY STATE */}
-        <div className="table-page__main-card">
-          {loading ? (
-            <div className="loading-state" style={{ textAlign: 'center', padding: '40px' }}>Đang tải dữ liệu...</div>
-          ) : tables.length > 0 ? (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Tên phòng/bàn</th>
-                  <th>Ghi chú</th>
-                  <th>Khu vực</th>
-                  <th>Số ghế</th>
-                  <th>Trạng thái</th>
-                  <th>Thứ tự</th>
-                  <th style={{ textAlign: 'right' }}>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tables.map((t) => (
-                  <tr key={t.id}>
-                    <td className="fw-bold" style={{ fontWeight: '600' }}>{t.name}</td>
-                    <td>{t.note || '---'}</td>
-                    <td>{t.areaName}</td>
-                    <td>{t.seats}</td>
-                    <td>
-                      <span className={`status-badge status-${t.status.toLowerCase().replace(/\s+/g, '-')}`}>
-                        {t.status}
-                      </span>
-                    </td>
-                    <td>{t.sortOrder}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button className="btn-danger-sm" onClick={() => handleDeleteTable(t.id)}>Xóa</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="empty-state">
-              <div className="empty-icon">📂</div>
-              <h3>Bắt đầu quản lý không gian cửa hàng với khu vực & phòng bàn</h3>
-              <p>Để thiết lập hồ sơ cửa hàng, trước tiên hãy tạo khu vực hoặc bạn có thể thêm phòng bàn ngay.</p>
-              <div className="empty-actions">
-                <button className="btn-outline" onClick={() => setShowTableModal(true)}>Tạo phòng bàn</button>
-                <button className="btn-primary" onClick={() => setShowAreaModal(true)}>Tạo khu vực</button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* MODAL TẠO KHU VỰC */}
-      {showAreaModal && (
-        <div className="modal-overlay">
-          <div className="modal-card">
-            <h3>Tạo Khu vực mới</h3>
-            <form onSubmit={handleCreateArea}>
-              <div className="form-group">
-                <label>Tên khu vực *</label>
-                <input 
-                  type="text" 
-                  required 
-                  placeholder="VD: Tầng 1, Sân thượng..." 
-                  value={newAreaName}
-                  onChange={(e) => setNewAreaName(e.target.value)}
-                />
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn-secondary" onClick={() => setShowAreaModal(false)}>Hủy</button>
-                <button type="submit" className="btn-primary">Lưu</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL TẠO PHÒNG BÀN */}
-      {showTableModal && (
-        <div className="modal-overlay">
-          <div className="modal-card">
-            <h3>Thêm Phòng / Bàn mới</h3>
-            <form onSubmit={handleCreateTable}>
-              <div className="form-group">
-                <label>Tên phòng/bàn *</label>
-                <input 
-                  type="text" 
-                  required 
-                  placeholder="VD: Bàn 01, VIP 2..." 
-                  value={newTable.name}
-                  onChange={(e) => setNewTable({ ...newTable, name: e.target.value })}
-                />
-              </div>
-              <div className="form-group">
-                <label>Khu vực</label>
-                <select 
-                  value={newTable.idArea} 
-                  onChange={(e) => setNewTable({ ...newTable, idArea: e.target.value })}
-                >
-                  <option value="">-- Chọn khu vực --</option>
-                  {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Số ghế</label>
-                  <input 
-                    type="number" 
-                    min="1" 
-                    value={newTable.seats}
-                    onChange={(e) => setNewTable({ ...newTable, seats: parseInt(e.target.value) || 1 })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Số thứ tự</label>
-                  <input 
-                    type="number" 
-                    value={newTable.sortOrder}
-                    onChange={(e) => setNewTable({ ...newTable, sortOrder: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Ghi chú</label>
-                <input 
-                  type="text" 
-                  placeholder="Ghi chú thêm..." 
-                  value={newTable.note}
-                  onChange={(e) => setNewTable({ ...newTable, note: e.target.value })}
-                />
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn-secondary" onClick={() => setShowTableModal(false)}>Hủy</button>
-                <button type="submit" className="btn-primary">Lưu</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+import { can, useAccess } from '../utils/staffAccess'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Search, Pencil, QrCode, Download, Upload, LayoutGrid, List, ArrowRightLeft } from 'lucide-react'
+import * as XLSX from 'xlsx'
+import QRCode from 'qrcode'
+import api from '../api/axiosClient'
+import Modal from '../components/Modal'
+import TableTransferModal from '../components/TableTransferModal'
+import { WarehouseTable } from '../components/WarehouseUi'
+import { money, day, date, exportSheet, errorText } from '../utils/warehouse'
+import './Menu.css'
+import './Inventory.css'
+import './TableManagement.css'
+const opNames = { Move: 'Chuyển bàn', Merge: 'Gộp bàn', Split: 'Tách bàn' }
+export default function TableManagement() {
+  useAccess()
+  const navigate = useNavigate(), file = useRef(null)
+  const [tables, setTables] = useState([]), [areas, setAreas] = useState([]), [operations, setOperations] = useState([]), [search, setSearch] = useState(''), [area, setArea] = useState(''), [status, setStatus] = useState('all'), [view, setView] = useState('grid'), [history, setHistory] = useState(false), [page, setPage] = useState(1), [loading, setLoading] = useState(true), [error, setError] = useState(''), [notice, setNotice] = useState(''), [modal, setModal] = useState(null), [formError, setFormError] = useState(''), [busy, setBusy] = useState(false), [transfer, setTransfer] = useState(null), [qrBase, setQrBase] = useState(import.meta.env.VITE_PUBLIC_URL || window.location.origin), [qrImage, setQrImage] = useState('')
+  const load = useCallback(async () => { try { const [t, a, o] = await Promise.all([api.get('/TableFood'), api.get('/TableFood/areas'), api.get('/TableFood/operations')]); setTables(t.data); setAreas(a.data); setOperations(o.data); setError('') } catch (e) { setError(errorText(e)) } finally { setLoading(false) } }, [])
+  useEffect(() => { load() }, [load])
+  const choose = (setter, value) => { setPage(1); setter(value) }
+  const open = (type, value, title) => { setFormError(''); setModal({ type, value, title }) }
+  const patch = value => setModal(m => ({ ...m, value: { ...m.value, ...value } }))
+  const close = () => { if (!busy) setModal(null) }
+  const editTable = table => open('table', table ? { ...table } : { name: '', seats: 4, sortOrder: tables.length + 1, note: '', idArea: areas.find(a => a.isActive)?.id || null, isActive: true }, table ? 'Sửa phòng/bàn' : 'Thêm phòng/bàn')
+  const editArea = item => open('area', item ? { ...item } : { name: '', isActive: true }, item ? 'Sửa khu vực' : 'Thêm khu vực')
+  const save = async () => { setBusy(true); setFormError(''); try { const v = modal.value; if (modal.type === 'excel') { const result = await api.post('/TableFood/excel', { preview: false, items: v.items }); if (!result.data.valid) throw new Error(result.data.errors.map(e => `Dòng ${e.row}: ${e.message}`).join('; ')) } else { const path = modal.type === 'area' ? '/TableFood/areas' : '/TableFood'; await api[v.id ? 'put' : 'post'](path + (v.id ? `/${v.id}` : ''), v) } setModal(null); setNotice('Đã lưu thông tin phòng/bàn.'); await load() } catch (e) { setFormError(e.response ? errorText(e) : e.message) } finally { setBusy(false) } }
+  const beginTransfer = async table => { try { const [b] = await Promise.all([api.get(`/Bill/table/${table.id}`), load()]); if (!b.data.items.length) throw new Error('Bàn chưa có món để chuyển; có thể đóng đơn trống tại bán hàng.'); setTransfer(b.data) } catch (e) { setError(e.response ? errorText(e) : e.message) } }
+  const qrUrl = id => { const base = new URL(qrBase); if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password) throw new Error('Địa chỉ QR cần là http/https hợp lệ.'); return `${base.origin}/menu-view/${id}` }
+  const showQR = async table => { try { const url = qrUrl(table.id); setQrImage(await QRCode.toDataURL(url, { width: 280, margin: 2 })); open('qr', { table, url }, `QR · ${table.name}`) } catch (e) { setError(e.message) } }
+  const downloadQRs = async () => { setBusy(true); try { const cards = await Promise.all(filtered.filter(t => t.isActive && t.areaActive).map(async t => ({ name: t.name, area: t.areaName, url: qrUrl(t.id), image: await QRCode.toDataURL(qrUrl(t.id), { width: 280, margin: 2 }) }))); const escape = text => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); const html = `<!doctype html><html lang="vi"><meta charset="utf-8"><title>Mã QR thực đơn</title><style>body{font-family:Arial;color:#153c5b;display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:20px}article{border:1px solid #ccc;text-align:center;padding:16px;break-inside:avoid}img{width:200px}small{display:block;overflow-wrap:anywhere}@media print{body{padding:0}}</style>${cards.map(c => `<article><h2>${escape(c.name)}</h2><p>${escape(c.area)}</p><img src="${c.image}" alt="QR"><p>Quét để xem thực đơn</p><small>${escape(c.url)}</small></article>`).join('')}</html>`; download(new Blob([html], { type: 'text/html' }), `QR-phong-ban-${day()}.html`); setNotice('Đã tải bộ QR. Mở file HTML và Ctrl+P để in.'); } catch (e) { setError(e.message) } finally { setBusy(false) } }
+  const download = (blob, name) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url) }
+  const readExcel = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { if (f.size > 5 * 1024 * 1024) throw new Error('File tối đa 5 MB.'); const book = XLSX.read(await f.arrayBuffer()); const rows = XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]]); const unknown = rows.filter(r => r['Khu vực'] && !areas.some(a => a.name === String(r['Khu vực']).trim())); if (unknown.length) throw new Error('Tạo khu vực tương ứng trước khi nhập Excel.'); const items = rows.map(r => ({ name: String(r['Tên phòng/bàn'] || ''), seats: Number(r['Số ghế'] ?? 4), sortOrder: Number(r['Thứ tự'] || 0), note: String(r['Ghi chú'] || ''), idArea: areas.find(a => a.name === String(r['Khu vực'] || '').trim())?.id ?? null, isActive: true })); const result = await api.post('/TableFood/excel', { preview: true, items }); open('excel', { items, ...result.data }, 'Kiểm tra Excel trước khi nhập') } catch (e) { setError(e.response ? errorText(e) : e.message) } }
+  const filtered = tables.filter(t => (!area || t.idArea === Number(area)) && (status === 'all' || t.status === status) && `${t.name} ${t.note || ''} ${t.areaName} ${t.seats}`.toLocaleLowerCase('vi').includes(search.toLocaleLowerCase('vi').trim()))
+  const pages = Math.max(1, Math.ceil(filtered.length / 12)), current = Math.min(page, pages), shown = filtered.slice((current - 1) * 12, current * 12)
+  const exports = () => exportSheet(filtered.map(t => ({ 'Tên phòng/bàn': t.name, 'Khu vực': t.areaName === 'Chưa xếp' ? '' : t.areaName, 'Số ghế': t.seats, 'Thứ tự': t.sortOrder, 'Ghi chú': t.note || '', 'Trạng thái': t.status })), `Phong-ban-${day()}`)
+  const rowActions = t => <div className="tb-actions"><button hidden={!can('TABLES_EDIT')} aria-label={`Sửa ${t.name}`} onClick={() => editTable(t)}><Pencil size={15}/></button>{t.isActive && t.areaActive && <button aria-label={`QR ${t.name}`} onClick={() => showQR(t)}><QrCode size={15}/></button>}{t.activeBillId > 0 && <button hidden={!can('POS_TRANSFER')} aria-label={`Chuyển gộp tách ${t.name}`} onClick={() => beginTransfer(t)}><ArrowRightLeft size={15}/></button>}<button hidden={!can('POS_VIEW')} disabled={!t.isActive || !t.areaActive} onClick={() => navigate(`/pos?table=${t.id}`)}>Bán hàng</button></div>
+  return <main className="menu-catalog warehouse table-manager"><div className="mc-heading"><div><span className="mc-eyebrow">KHÔNG GIAN & PHỤC VỤ</span><h1>Phòng / Bàn</h1><p>Sắp xếp khu vực, theo dõi bàn và phục vụ khách linh hoạt.</p></div><div className="mc-toolbar"><button hidden={!can('TABLES_CREATE')} onClick={() => editArea()}><Plus size={16}/>Khu vực</button><button hidden={!can('TABLES_CREATE')} className="mc-primary" onClick={() => editTable()}><Plus size={16}/>Thêm phòng/bàn</button></div></div>{error && <div className="wh-alert">{error}<button onClick={load}>Thử lại</button></div>}{notice && <div className="mc-notice">{notice}<button onClick={() => setNotice('')}>✕</button></div>}
+    <div className="mc-stats"><div><span>Đang hoạt động</span><b>{tables.filter(t => t.isActive && t.areaActive).length}<small> phòng/bàn</small></b></div><div><span>Đang phục vụ</span><b>{tables.filter(t => t.activeBillId).length}<small> bàn</small></b></div><div><span>Bàn sẵn sàng</span><b>{tables.filter(t => t.status === 'Trống').length}<small> bàn</small></b></div><div><span>Sức chứa đang hoạt động</span><b>{tables.filter(t => t.isActive && t.areaActive).reduce((s, t) => s + t.seats, 0)}<small> ghế</small></b></div></div>
+    <div className="wh-tabs"><button className={!history ? 'selected' : ''} onClick={() => setHistory(false)}>Danh sách phòng/bàn</button><button className={history ? 'selected' : ''} onClick={() => setHistory(true)}>Lịch sử chuyển / gộp / tách</button></div>
+    {!history ? <div className="mc-layout"><aside className="mc-sidebar"><h3>Khu vực</h3><button className={!area ? 'selected' : ''} onClick={() => choose(setArea, '')}>Tất cả<span>{tables.length}</span></button>{areas.map(a => <div className="wh-group" key={a.id}><button className={Number(area) === a.id ? 'selected' : ''} onClick={() => choose(setArea, a.id)}>{a.name}{!a.isActive && ' · Ngừng'}</button><button hidden={!can('TABLES_EDIT')} aria-label={`Sửa khu vực ${a.name}`} onClick={() => editArea(a)}><Pencil size={13}/></button></div>)}<button hidden={!can('TABLES_CREATE')} onClick={() => editArea()}>+ Thêm khu vực</button><hr/><p className="mc-tip">Trạng thái có khách được xác định theo hóa đơn mở. Bàn và khu vực đang phục vụ không thể ngừng hoạt động.</p></aside><section className="mc-main"><div className="mc-filters"><div className="mc-search"><Search size={17}/><input placeholder="Tìm tên bàn, khu vực, số ghế, ghi chú..." value={search} onChange={e => choose(setSearch, e.target.value)}/></div><select aria-label="Trạng thái bàn" value={status} onChange={e => choose(setStatus, e.target.value)}><option value="all">Mọi trạng thái</option><option value="Trống">Bàn trống</option><option value="Có người">Đang phục vụ</option><option value="Ngừng hoạt động">Ngừng hoạt động</option></select></div>
+    <div className="mc-listbar"><span>{filtered.length} phòng/bàn</span><div><button onClick={() => setView(view === 'grid' ? 'list' : 'grid')}>{view === 'grid' ? <List size={15}/> : <LayoutGrid size={15}/>}</button><button onClick={load}>Làm mới</button><button onClick={() => exportSheet([{ 'Tên phòng/bàn': 'Bàn 01', 'Khu vực': '', 'Số ghế': 4, 'Thứ tự': 1, 'Ghi chú': '' }], 'Mau-phong-ban')}>Tải mẫu</button><button hidden={!can('TABLES_IMPORT')} onClick={() => file.current.click()}><Upload size={14}/>Excel</button><button onClick={exports}><Download size={14}/>Xuất</button></div><input hidden ref={file} type="file" accept=".xlsx,.xls" onChange={readExcel}/></div>
+    {loading ? <div className="mc-empty">Đang tải phòng/bàn...</div> : !shown.length ? <div className="mc-empty"><LayoutGrid size={40}/><h3>Chưa có phòng/bàn phù hợp</h3><p>Thêm bàn mới hoặc thay đổi bộ lọc.</p><button hidden={!can('TABLES_CREATE')} onClick={() => editTable()}>Thêm phòng/bàn</button></div> : view === 'grid' ? <div className="tb-grid">{shown.map(t => <article key={t.id} className={t.activeBillId ? 'occupied' : t.status === 'Ngừng hoạt động' ? 'stopped' : ''}><div className="tb-card-top"><span>{t.areaName}</span><b className="tb-badge">{t.status}</b></div><h2>{t.name}</h2><p>{t.seats} ghế · Thứ tự {t.sortOrder}</p><small>{t.note || 'Chưa có ghi chú'}</small>{t.activeBillId > 0 && <div className="tb-amount">Đơn #{t.activeBillId} · {money(t.amount)}<small>{t.guestCount == null ? 'Chưa ghi số khách' : `${t.guestCount} khách`}</small></div>}{rowActions(t)}</article>)}</div> : <WarehouseTable headers={['Phòng/bàn', 'Khu vực', 'Ghế / thứ tự', 'Trạng thái', 'Đơn hiện tại', 'Thao tác']}>{shown.map(t => <tr key={t.id}><td><b>{t.name}</b><small>{t.note}</small></td><td>{t.areaName}</td><td>{t.seats} / {t.sortOrder}</td><td>{t.status}</td><td>{t.activeBillId ? money(t.amount) : '—'}</td><td>{rowActions(t)}</td></tr>)}</WarehouseTable>}
+    <div className="mc-pagination"><span>Trang {current}/{pages}</span><button disabled={current === 1} onClick={() => setPage(current - 1)}>Trước</button><button disabled={current === pages} onClick={() => setPage(current + 1)}>Sau</button></div><div className="tb-qr-settings"><label>Địa chỉ quán cho mã QR<input placeholder="https://dia-chi-quan hoặc địa chỉ LAN" value={qrBase} onChange={e => setQrBase(e.target.value)}/></label><button disabled={busy} onClick={downloadQRs}>Tải bộ QR để in</button><small>localhost dùng trên máy này. Để điện thoại quét được, nhập địa chỉ triển khai hoặc địa chỉ mạng LAN đang phục vụ frontend.</small></div></section></div> : <section className="mc-main"><div className="mc-listbar"><p>200 thao tác gần nhất</p><button onClick={load}>Làm mới</button></div><WarehouseTable empty={!operations.length} headers={['Thời gian', 'Thao tác', 'Nguồn → đích', 'Món đã chuyển', 'Người lập / ghi chú']}>{operations.map(o => <tr key={o.id}><td>{date(o.createdAt)}</td><td>{opNames[o.kind]}</td><td>{o.sourceName} → {o.targetName}<small>HD{o.sourceBillId} → HD{o.targetBillId}</small></td><td>{JSON.parse(o.itemsJson).map((i, n) => <div key={n}>{i.Count} × {i.Name}<small>{i.OptionLabel}</small></div>)}</td><td>{o.createdBy}<small>{o.note}</small></td></tr>)}</WarehouseTable></section>}
+    {transfer && <TableTransferModal bill={transfer} tables={tables} onClose={() => setTransfer(null)} onDone={async () => { setTransfer(null); setNotice('Đã chuyển món, giữ nguyên tồn kho và trạng thái bếp.'); await load() }}/>}
+    {modal && <Modal width={modal.type === 'excel' ? 850 : 640} title={modal.title} onClose={close} footer={<><button disabled={busy} onClick={close}>Đóng</button>{modal.type !== 'qr' && <button hidden={!can(modal.type === 'excel' ? 'TABLES_IMPORT' : modal.value.id ? 'TABLES_EDIT' : 'TABLES_CREATE')} className="btn btn-primary" disabled={busy || (modal.type === 'excel' && !modal.value.valid)} onClick={save}>{busy ? 'Đang lưu...' : 'Lưu'}</button>}</>}><div className="wh-form">{formError && <div className="wh-alert">{formError}</div>}{['table', 'area'].includes(modal.type) && <><label>Tên {modal.type === 'area' ? 'khu vực' : 'phòng/bàn'}<input value={modal.value.name} maxLength={100} onChange={e => patch({ name: e.target.value })}/></label>{modal.type === 'table' && <><label>Khu vực<select value={modal.value.idArea || ''} onChange={e => patch({ idArea: Number(e.target.value) || null })}><option value="">Chưa xếp khu vực</option>{areas.map(a => <option value={a.id} key={a.id}>{a.name}{!a.isActive && ' · Ngừng hoạt động'}</option>)}</select></label><div className="wh-fields"><label>Số ghế<input type="number" min="1" max="1000" value={modal.value.seats} onChange={e => patch({ seats: Number(e.target.value) })}/></label><label>Số thứ tự<input type="number" min="0" value={modal.value.sortOrder} onChange={e => patch({ sortOrder: Number(e.target.value) })}/></label></div><label>Ghi chú<textarea maxLength={255} value={modal.value.note || ''} onChange={e => patch({ note: e.target.value })}/></label></>}<label><input type="checkbox" checked={modal.value.isActive} onChange={e => patch({ isActive: e.target.checked })}/> Đang hoạt động</label><p className="wh-help">Ngừng hoạt động giữ nguyên lịch sử. Không thể ngừng khi có hóa đơn đang phục vụ.</p>{modal.type === 'area' && modal.value.id && <button hidden={!can('TABLES_DELETE')} disabled={busy} onClick={async () => { setBusy(true); try { await api.delete(`/TableFood/areas/${modal.value.id}`); setModal(null); await load() } catch (e) { setFormError(errorText(e)) } finally { setBusy(false) } }}>Xóa khu vực trống</button>}</>}
+    {modal.type === 'qr' && <div className="tb-qr"><h2>{modal.value.table.name}</h2><img src={qrImage} alt={`QR ${modal.value.table.name}`}/><p>Quét để xem thực đơn</p><a href={modal.value.url} target="_blank" rel="noreferrer">{modal.value.url}</a><p>Khách xem món, size và topping; đặt món qua nhân viên.</p><a className="btn btn-primary" href={qrImage} download={`QR-ban-${modal.value.table.id}.png`}>Tải ảnh QR</a></div>}
+    {modal.type === 'excel' && <><h3>{modal.value.count} bàn · {modal.value.valid ? 'Dữ liệu hợp lệ' : 'Cần sửa file'}</h3><p>Chỉ thêm bàn mới, không ghi đè đơn đang phục vụ.</p>{modal.value.errors.map((e, n) => <p className="wh-alert" key={n}>Dòng {e.row}: {e.message}</p>)}<WarehouseTable headers={['Tên', 'Khu vực', 'Số ghế']}>{modal.value.items.slice(0, 20).map((t, n) => <tr key={n}><td>{t.name}</td><td>{areas.find(a => a.id === t.idArea)?.name || 'Chưa xếp'}</td><td>{t.seats}</td></tr>)}</WarehouseTable></>}
+    </div></Modal>}
+  </main>
 }
-
-export default TableManagement;

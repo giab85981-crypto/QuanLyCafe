@@ -227,60 +227,6 @@
 }
  
 /* ---------- Modal ---------- */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: rgba(13, 44, 79, 0.45);
-}
- 
-.modal {
-  max-width: 100%;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 12px 40px rgba(13, 44, 79, 0.3);
-}
- 
-.modal__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--line);
-}
- 
-.modal__head h3 {
-  font-size: 16px;
-}
- 
-.modal__close {
-  border: none;
-  background: transparent;
-  font-size: 16px;
-  color: var(--text-mute);
-  cursor: pointer;
-}
- 
-.modal__body {
-  padding: 16px 18px;
-  overflow-y: auto;
-}
- 
-.modal__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 18px;
-  border-top: 1px solid var(--line);
-}
- 
 .field {
   display: flex;
   flex-direction: column;

@@ -49,6 +49,19 @@ namespace CafeManagement.API.Entities
         [MaxLength(100)]
         public string ItemType { get; set; } = string.Empty;
 
+        [MaxLength(20)]
+        public string MenuKind { get; set; } = "Khác";
+        public bool IsActive { get; set; } = true;
+        public bool IsTopping { get; set; }
+        public bool IsFavorite { get; set; }
+        [MaxLength(100)]
+        public string Code { get; set; } = string.Empty;
+        [MaxLength(1000)]
+        public string Description { get; set; } = string.Empty;
+        public string? ImageUrl { get; set; }
+        public ICollection<FoodVariant> Variants { get; set; } = new List<FoodVariant>();
+        public ICollection<FoodTopping> AllowedToppings { get; set; } = new List<FoodTopping>();
+
         public ICollection<Recipe> Recipes { get; set; } = new List<Recipe>();
         public ICollection<BillInfo> BillInfos { get; set; } = new List<BillInfo>();
         public ICollection<KitchenOrderDetail> KitchenOrderDetails { get; set; } = new List<KitchenOrderDetail>();

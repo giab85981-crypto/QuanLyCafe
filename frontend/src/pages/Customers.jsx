@@ -1,141 +1,96 @@
-import { useEffect, useMemo, useState } from 'react'
-import axiosClient from '../api/axiosClient'
-import { errMsg } from '../api/errMsg'
+import { can, useAccess } from '../utils/staffAccess'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Users, UserPlus, Star, Wallet, Search, Download, Upload, Pencil, ChevronRight, Tags } from 'lucide-react'
+import * as XLSX from 'xlsx'
+import axios from '../api/axiosClient'
 import Modal from '../components/Modal'
-import './Page.css'
-
-function Customers() {
-  const [list, setList] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [keyword, setKeyword] = useState('')
-
-  const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name: '', phone: '' })
-  const [formError, setFormError] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  const load = () =>
-    axiosClient
-      .get('/Customer')
-      .then((r) => {
-        setList(r.data)
-        setError('')
+import { customerWorkbook } from '../utils/customerExcel'
+import './Customers.css'
+const money = n => Number(n || 0).toLocaleString('vi-VN')
+const date = d => d ? new Date(d).toLocaleDateString('vi-VN') : '—'
+const time = d => d ? new Date(d).toLocaleString('vi-VN') : '—'
+const err = e => e.response?.status >= 500 ? 'Máy chủ gặp lỗi. Kiểm tra backend/LocalDB rồi thử lại.' : e.response?.status === 401 ? 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.' : typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || e.message || 'Thao tác thất bại.'
+const blank = () => ({ name: '', phone: '', email: '', address: '', note: '', gender: '', birthday: '', idGroup: '' })
+const statuses = ['Đang phục vụ', 'Đã thanh toán', 'Đã đóng / gộp', 'Đã hoàn tiền']
+const headers = ['Tên khách hàng', 'Điện thoại', 'Email', 'Ngày sinh', 'Giới tính', 'Địa chỉ', 'Nhóm', 'Ghi chú']
+export default function Customers() {
+  useAccess()
+  const navigate = useNavigate()
+  const [filters, setFilters] = useState({ search: '', group: '', active: 'true', gender: '', birthdayMonth: '', from: '', to: '', minSpend: '', maxSpend: '', sort: 'new' })
+  const [page, setPage] = useState(1), [list, setList] = useState({ rows: [], total: 0, activeCount: 0, totalPoints: 0, spend: 0 })
+  const [groups, setGroups] = useState([]), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('')
+  const [editor, setEditor] = useState(null), [form, setForm] = useState(blank), [detail, setDetail] = useState(null), [detailTab, setDetailTab] = useState('info')
+  const [groupModal, setGroupModal] = useState(false), [groupName, setGroupName] = useState(''), [groupEdit, setGroupEdit] = useState(null)
+  const [download, setDownload] = useState(null)
+  useEffect(() => { if (download) return () => URL.revokeObjectURL(download.url) }, [download])
+  const [importData, setImportData] = useState(null), [importErrors, setImportErrors] = useState([]), [importValid, setImportValid] = useState(false)
+  const seq = useRef(0), file = useRef(null)
+  const params = useCallback(() => {
+    const p = Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== ''))
+    if (p.from) p.from += 'T00:00:00'
+    if (p.to) { const d = new Date(`${p.to}T00:00:00`); d.setDate(d.getDate() + 1); p.to = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T00:00:00` }
+    return p
+  }, [filters])
+  const load = useCallback(async () => {
+    const request = ++seq.current; setLoading(true)
+    try { const r = await axios.get('/Customer/manage', { params: { ...params(), page } }); if (request === seq.current) { setList(r.data); setError('') } }
+    catch (e) { if (request === seq.current) setError(err(e)) }
+    finally { if (request === seq.current) setLoading(false) }
+  }, [params, page])
+  const loadGroups = useCallback(async () => { const r = await axios.get('/Customer/groups'); setGroups(r.data) }, [])
+  useEffect(() => { const t = setTimeout(load, 250); return () => { clearTimeout(t); seq.current++ } }, [load])
+  useEffect(() => { loadGroups().catch(e => setError(err(e))) }, [loadGroups])
+  const filter = (key, value) => { setFilters(f => ({ ...f, [key]: value })); setPage(1) }
+  const action = async fn => { setBusy(true); setError(''); setNotice(''); try { await fn() } catch (e) { setError(err(e)) } finally { setBusy(false) } }
+  const open = async (id, billPage = 1, pointPage = 1) => { const r = await axios.get(`/Customer/${id}`, { params: { billPage, pointPage } }); setDetail(r.data) }
+  const edit = c => { setForm(c ? { ...c, birthday: c.birthday?.slice(0, 10) || '', idGroup: c.idGroup ?? '' } : blank()); setEditor(c?.id || 'new'); setDetail(null); setError('') }
+  const save = () => action(async () => {
+    const payload = { name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim(), address: form.address.trim(), note: form.note.trim(), gender: form.gender, birthday: form.birthday || null, idGroup: form.idGroup === '' ? null : Number(form.idGroup) }
+    if (!payload.name || !payload.phone) throw new Error('Nhập tên và số điện thoại khách hàng.')
+    if (editor === 'new') await axios.post('/Customer', payload); else await axios.put(`/Customer/${editor}`, payload)
+    setEditor(null); await load(); setNotice('Đã lưu thông tin khách hàng.')
+  })
+  const changeStatus = () => action(async () => { await axios.put(`/Customer/${detail.customer.id}/status`, { isActive: !detail.customer.isActive }); await open(detail.customer.id, detail.billPage, detail.pointPage); await load(); setNotice('Đã cập nhật trạng thái. Lịch sử mua hàng và điểm được giữ nguyên.') })
+  const saveGroup = () => action(async () => { if (groupEdit) await axios.put(`/Customer/groups/${groupEdit}`, { name: groupName }); else await axios.post('/Customer/groups', { name: groupName }); await loadGroups(); await load(); setGroupName(''); setGroupEdit(null); setNotice('Đã lưu nhóm khách hàng.') })
+  const exportExcel = () => action(async () => {
+    if (list.total > 10000) throw new Error('Lọc còn tối đa 10.000 khách trước khi xuất.')
+    let rows = []; for (let p = 1; p <= Math.ceil(list.total / 100); p++) { const r = await axios.get('/Customer/manage', { params: { ...params(), page: p, pageSize: 100 } }); rows.push(...r.data.rows) }
+    const wb = customerWorkbook(rows); const blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); setDownload({ url: URL.createObjectURL(blob), name: 'khach-hang.xlsx' }); setNotice('File Excel đã sẵn sàng. Bấm Tải file Excel để lưu.')
+  })
+  const template = () => { const ws = XLSX.utils.aoa_to_sheet([headers, ['Khách demo', '0901234567', '', '2000-01-15', 'Nam', '', '', '']]); ws['!cols'] = headers.map(() => ({ wch: 24 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Khách hàng'); setDownload({ url: URL.createObjectURL(new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })), name: 'mau-khach-hang.xlsx' }) }
+  const readFile = async event => {
+    const chosen = event.target.files[0]; event.target.value = ''; if (!chosen) return
+    await action(async () => {
+      if (chosen.size > 5 * 1024 * 1024) throw new Error('File tối đa 5 MB.')
+      const wb = XLSX.read(await chosen.arrayBuffer(), { type: 'array', cellDates: false }); const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: true })
+      if (!rows.length || rows.length > 500) throw new Error('File cần từ 1–500 khách hàng.')
+      const data = rows.map((r, index) => {
+        if (!Object.hasOwn(r, 'Tên khách hàng') || !Object.hasOwn(r, 'Điện thoại')) throw new Error('Dùng file mẫu có cột Tên khách hàng và Điện thoại.')
+        let birthday = String(r['Ngày sinh'] || '').trim(); if (typeof r['Ngày sinh'] === 'number') { const d = XLSX.SSF.parse_date_code(r['Ngày sinh']); if (!d) throw new Error(`Ngày sinh dòng ${index + 2} không hợp lệ.`); birthday = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}` }
+        if (birthday && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) throw new Error(`Ngày sinh dòng ${index + 2} cần dạng YYYY-MM-DD.`)
+        const group = String(r.Nhóm || '').trim(); const found = groups.find(g => g.name.toLowerCase() === group.toLowerCase()); if (group && !found) throw new Error(`Nhóm '${group}' ở dòng ${index + 2} chưa có. Tạo nhóm trước.`)
+        return { name: String(r['Tên khách hàng']).trim(), phone: String(r['Điện thoại']).trim(), email: String(r.Email || '').trim(), birthday: birthday || null, gender: String(r['Giới tính'] || '').trim(), address: String(r['Địa chỉ'] || '').trim(), note: String(r['Ghi chú'] || '').trim(), idGroup: found?.id ?? null }
       })
-      .catch((e) => setError(errMsg(e, 'Không tải được danh sách khách hàng.')))
-      .finally(() => setLoading(false))
-
-  useEffect(() => {
-    load()
-  }, [])
-
-  const rows = useMemo(() => {
-    const kw = keyword.trim().toLowerCase()
-    return list.filter((c) => !kw || c.name.toLowerCase().includes(kw) || c.phone.includes(kw))
-  }, [list, keyword])
-
-  const submit = async () => {
-    const name = form.name.trim()
-    const phone = form.phone.trim()
-    if (!name) return setFormError('Nhập tên khách hàng.')
-    if (phone && !/^\d{9,11}$/.test(phone)) return setFormError('Số điện thoại phải gồm 9–11 chữ số.')
-    if (phone && list.some((c) => c.phone === phone)) return setFormError('Số điện thoại này đã có trong danh sách.')
-
-    setSaving(true)
-    try {
-      await axiosClient.post('/Customer', { name, phone })
-      setShowAdd(false)
-      load()
-    } catch (e) {
-      setFormError(errMsg(e, 'Không thêm được khách hàng.'))
-    } finally {
-      setSaving(false)
-    }
+      setImportData({ items: data, name: chosen.name }); setImportValid(false); setImportErrors([])
+      const r = await axios.post('/Customer/import', { items: data, preview: true }); setImportValid(r.data.valid); setImportErrors(r.data.errors)
+    })
   }
-
-  return (
-    <div className="pg">
-      <div className="pg-head">
-        <h1>Khách hàng</h1>
-        <div className="pg-tools">
-          <input
-            className="pg-input pg-input--search"
-            placeholder="Tìm theo tên hoặc số điện thoại"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-          />
-          <button
-            className="pg-btn pg-btn--primary"
-            onClick={() => {
-              setForm({ name: '', phone: '' })
-              setFormError('')
-              setShowAdd(true)
-            }}
-          >
-            + Thêm khách hàng
-          </button>
-        </div>
-      </div>
-
-      {error && <div className="pg-error">{error}</div>}
-
-      <div className="pg-card pg-table-wrap">
-        <table className="pg-table">
-          <thead>
-            <tr>
-              <th>Mã</th>
-              <th>Tên khách hàng</th>
-              <th>Điện thoại</th>
-              <th className="num">Điểm tích lũy</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <tr><td colSpan="4" className="pg-empty">Đang tải...</td></tr>}
-            {!loading && rows.length === 0 && !error && (
-              <tr>
-                <td colSpan="4" className="pg-empty">
-                  {list.length === 0 ? 'Chưa có khách hàng nào.' : 'Không tìm thấy khách hàng phù hợp.'}
-                </td>
-              </tr>
-            )}
-            {rows.map((c) => (
-              <tr key={c.id}>
-                <td>KH{String(c.id).padStart(4, '0')}</td>
-                <td>{c.name}</td>
-                <td>{c.phone || <span className="pg-mute">—</span>}</td>
-                <td className="num">{Number(c.points).toLocaleString('vi-VN')}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {showAdd && (
-        <Modal
-          title="Thêm khách hàng"
-          onClose={() => setShowAdd(false)}
-          footer={
-            <>
-              <button className="pg-btn" onClick={() => setShowAdd(false)}>Hủy</button>
-              <button className="pg-btn pg-btn--primary" onClick={submit} disabled={saving}>
-                {saving ? 'Đang lưu...' : 'Thêm khách hàng'}
-              </button>
-            </>
-          }
-        >
-          {formError && <div className="pg-error">{formError}</div>}
-          <div className="field">
-            <label htmlFor="cname">Tên khách hàng</label>
-            <input id="cname" autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div className="field">
-            <label htmlFor="cphone">Số điện thoại</label>
-            <input id="cphone" inputMode="numeric" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          </div>
-        </Modal>
-      )}
-    </div>
-  )
+  const commitImport = () => action(async () => { const r = await axios.post('/Customer/import', { items: importData.items, preview: false }); if (!r.data.valid) { setImportErrors(r.data.errors); setImportValid(false); return } setImportData(null); await load(); setNotice(`Đã nhập ${r.data.count} khách hàng.`) })
+  return <main className="customers-page">
+    <header className="customers-heading"><div><p>ĐỐI TÁC · CHĂM SÓC KHÁCH HÀNG</p><h1>Khách hàng</h1><span>Nhớ từng vị khách, chăm sóc mỗi lần ghé quán.</span></div><div className="customers-toolbar"><button hidden={!can('CUSTOMERS_GROUPS')} disabled={busy} onClick={() => { setGroupModal(true); setError('') }}><Tags size={17} /> Nhóm khách</button><button hidden={!can('CUSTOMERS_IMPORT')} disabled={busy} onClick={() => file.current.click()}><Upload size={17} /> Nhập Excel</button><button disabled={busy || !list.total} onClick={exportExcel}><Download size={17} /> Xuất Excel</button><button hidden={!can('CUSTOMERS_CREATE')} className="primary" disabled={busy} onClick={() => edit(null)}><UserPlus size={18} /> Thêm khách hàng</button><input ref={file} hidden type="file" accept=".xlsx,.xls,.csv" onChange={readFile} /></div></header>
+    <section className="customers-stats">{[[Users, 'Khách hàng', list.total, 'Theo bộ lọc hiện tại'], [UserPlus, 'Đang hoạt động', list.activeCount, 'Có thể chọn khi bán hàng'], [Wallet, 'Chi tiêu thực thu', money(list.spend) + ' đ', 'Đã trừ hóa đơn hoàn tiền'], [Star, 'Số dư điểm', money(list.totalPoints), '1 điểm đổi 100đ']].map(([Icon, title, value, caption]) => <article key={title}><Icon size={22} /><div><span>{title}</span><strong>{value}</strong><small>{caption}</small></div></article>)}</section>
+    {error && <p role="alert" className="customers-error">{error}</p>}{notice && <p role="status" className="customers-notice">{notice}</p>}{download && <p className="customers-notice">{download.name} · <a className="customer-download" href={download.url} download={download.name}>Tải file Excel</a></p>}
+    <div className="customers-layout"><aside className="customers-filters"><h3>Bộ lọc khách hàng</h3><label>Nhóm khách hàng<select value={filters.group} onChange={e => filter('group', e.target.value)}><option value="">Tất cả nhóm</option><option value="0">Chưa phân nhóm</option>{groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label><label>Trạng thái<select value={filters.active} onChange={e => filter('active', e.target.value)}><option value="">Tất cả</option><option value="true">Đang hoạt động</option><option value="false">Ngừng hoạt động</option></select></label><label>Giới tính<select value={filters.gender} onChange={e => filter('gender', e.target.value)}><option value="">Tất cả</option>{['Nam', 'Nữ', 'Khác'].map(g => <option key={g}>{g}</option>)}</select></label><label>Tháng sinh<select value={filters.birthdayMonth} onChange={e => filter('birthdayMonth', e.target.value)}><option value="">Tất cả tháng</option>{Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>Tháng {i + 1}</option>)}</select></label><label>Ngày tạo từ<input type="date" value={filters.from} onInput={e => filter("from", e.currentTarget.value)} onChange={e => filter('from', e.target.value)} /></label><label>Đến ngày<input type="date" value={filters.to} onInput={e => filter("to", e.currentTarget.value)} onChange={e => filter('to', e.target.value)} /></label><label>Chi tiêu từ (đ)<input type="number" min="0" value={filters.minSpend} onChange={e => filter('minSpend', e.target.value)} /></label><label>Chi tiêu đến (đ)<input type="number" min="0" value={filters.maxSpend} onChange={e => filter('maxSpend', e.target.value)} /></label><button onClick={() => { setFilters({ search: '', group: '', active: '', gender: '', birthdayMonth: '', from: '', to: '', minSpend: '', maxSpend: '', sort: 'new' }); setPage(1) }}>Xóa bộ lọc</button><div className="customers-tip"><Star size={18} /><p>Mỗi 10.000đ thực trả tích 1 điểm. Điểm của lần mua trước được dùng giảm giá lần sau.</p></div></aside>
+    <section className="customers-list"><div className="customers-listbar"><div className="customers-search"><Search size={18} /><input aria-label="Tìm khách hàng" placeholder="Tìm mã, tên, điện thoại hoặc email..." value={filters.search} onChange={e => filter('search', e.target.value)} /></div><select aria-label="Sắp xếp khách hàng" value={filters.sort} onChange={e => filter('sort', e.target.value)}><option value="new">Mới nhất</option><option value="name">Tên A → Z</option><option value="spend">Chi tiêu cao nhất</option></select><button disabled={busy || loading} onClick={load}>Làm mới</button></div><div className="customers-table-wrap"><table><thead><tr><th>Khách hàng</th><th>Liên hệ</th><th>Nhóm</th><th>Điểm</th><th>Lần mua</th><th>Chi tiêu thực thu</th><th>Ghé gần nhất</th><th /></tr></thead><tbody>{list.rows.map(c => <tr key={c.id} onClick={() => action(async () => { await open(c.id); setDetailTab('info') })}><td><div className="customer-identity"><span className="customer-avatar">{c.name.slice(0, 1).toUpperCase()}</span><div><b>{c.name}</b><small>{c.code} · <span className={c.isActive ? 'customer-active' : ''}>{c.isActive ? 'Hoạt động' : 'Ngừng hoạt động'}</span></small></div></div></td><td>{c.phone}<small>{c.email || '—'}</small></td><td><span className="customer-group">{c.groupName}</span></td><td className={c.points < 0 ? 'customer-negative' : 'customer-points'}>{money(c.points)}</td><td>{c.visits}</td><td><b>{money(c.netSpend)} đ</b>{c.estimated > 0 && <small className="customer-negative">{c.estimated} hóa đơn thiếu thực thu</small>}</td><td>{date(c.lastVisit)}</td><td><ChevronRight size={17} /></td></tr>)}</tbody></table></div>{loading && <p className="customers-empty">Đang tải khách hàng...</p>}{!loading && !list.rows.length && <div className="customers-empty"><Users size={36} /><h3>{filters.search ? 'Không tìm thấy khách phù hợp' : 'Chào đón những vị khách đầu tiên'}</h3><p>Thêm khách tại đây hoặc ngay trên màn hình bán hàng.</p><button hidden={!can('CUSTOMERS_CREATE')} className="primary" onClick={() => edit(null)}>Thêm khách hàng</button></div>}<footer><span>{list.total} khách · Trang {page}/{Math.max(1, Math.ceil(list.total / 15))}</span><button disabled={loading || page === 1} onClick={() => setPage(p => p - 1)}>Trước</button><button disabled={loading || page * 15 >= list.total} onClick={() => setPage(p => p + 1)}>Sau</button></footer></section></div>
+    {editor && <Modal width={680} title={editor === 'new' ? 'Thêm khách hàng' : 'Sửa khách hàng'} onClose={() => { if (!busy) setEditor(null) }} footer={<><button disabled={busy} onClick={() => setEditor(null)}>Đóng</button><button hidden={!can(editor !== 'new' ? 'CUSTOMERS_EDIT' : 'CUSTOMERS_CREATE')} className="primary" disabled={busy} onClick={save}>{busy ? 'Đang lưu...' : 'Lưu khách hàng'}</button></>}><div className="customers-form">{[['name', 'Tên khách hàng *', 'text', 150], ['phone', 'Điện thoại *', 'tel', 30], ['email', 'Email', 'email', 150], ['birthday', 'Ngày sinh', 'date']].map(([key, title, type, max]) => <label key={key}>{title}<input autoFocus={key === 'name'} type={type} maxLength={max} value={form[key]} onInput={type === "date" ? e => { const value = e.currentTarget.value; setForm(f => ({ ...f, [key]: value })) } : undefined} onChange={e => { const value = e.currentTarget.value; setForm(f => ({ ...f, [key]: value })) }} /></label>)}<label>Giới tính<select value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}><option value="">Chưa cung cấp</option>{['Nam', 'Nữ', 'Khác'].map(g => <option key={g}>{g}</option>)}</select></label><label>Nhóm khách hàng<select value={form.idGroup} onChange={e => setForm(f => ({ ...f, idGroup: e.target.value }))}><option value="">Chưa phân nhóm</option>{groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label><label className="wide">Địa chỉ<input maxLength={300} value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} /></label><label className="wide">Ghi chú<textarea maxLength={500} placeholder="VD: Thích ít đường, khách quen buổi sáng..." value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} /></label><p className="wide">Mã khách được tạo tự động. Điểm chỉ thay đổi qua thanh toán và hoàn tiền.</p></div>{error && <p className="customers-error">{error}</p>}</Modal>}
+    {detail && <Modal width={900} title={`${detail.customer.code} · ${detail.customer.name}`} onClose={() => { if (!busy) setDetail(null) }} footer={<><button hidden={!can('CUSTOMERS_EDIT')} disabled={busy} onClick={() => edit(detail.customer)}><Pencil size={16} /> Sửa thông tin</button><button hidden={!can('CUSTOMERS_EDIT')} disabled={busy} onClick={changeStatus}>{detail.customer.isActive ? 'Ngừng hoạt động' : 'Kích hoạt lại'}</button><button disabled={busy} onClick={() => setDetail(null)}>Đóng</button></>}><div className="customer-detail-summary"><span><small>Chi tiêu thực thu</small><b>{money(detail.netSpend)} đ</b></span><span><small>Lần mua thành công</small><b>{detail.visits}</b></span><span><small>Điểm hiện có</small><b>{money(detail.customer.points)}</b></span><span><small>Đã hoàn tiền</small><b>{money(detail.refundAmount)} đ</b></span></div><div className="customers-tabs">{[['info', 'Thông tin'], ['bills', 'Lịch sử mua hàng'], ['points', 'Lịch sử điểm']].map(([key, title]) => <button key={key} className={detailTab === key ? 'selected' : ''} onClick={() => setDetailTab(key)}>{title}</button>)}</div>
+    {detail.customer.points < 0 && <p className="customers-error">Điểm đã dùng trước khi hoàn hóa đơn. Số dư âm được bù bằng điểm tích ở các lần mua tiếp theo; hiện chưa thể đổi điểm.</p>}
+    {detailTab === 'info' && <div className="customer-info">{[['Điện thoại', detail.customer.phone], ['Email', detail.customer.email], ['Ngày sinh', date(detail.customer.birthday)], ['Giới tính', detail.customer.gender], ['Nhóm', detail.customer.groupName], ['Trạng thái', detail.customer.isActive ? 'Đang hoạt động' : 'Ngừng hoạt động'], ['Địa chỉ', detail.customer.address], ['Ghi chú', detail.customer.note], ['Ngày tạo', time(detail.customer.createdAt)], ['Tổng bán trước hoàn tiền', money(detail.totalSales) + ' đ']].map(([label, value]) => <div key={label}><small>{label}</small><span>{value || '—'}</span></div>)}</div>}
+    {detailTab === 'bills' && <><div className="customers-table-wrap"><table><thead><tr><th>Hóa đơn</th><th>Thời gian</th><th>Trạng thái</th><th>Thực trả</th><th>Điểm tích / đổi</th></tr></thead><tbody>{detail.bills.map(b => <tr key={b.id}><td><button hidden={!can('ORDERS_VIEW')} className="customer-link" onClick={() => navigate(`/orders?invoice=${b.id}`)}>HD{String(b.id).padStart(6, '0')}</button><small>{b.orderType === 'Takeaway' ? 'Mang về' : 'Tại quán'}</small></td><td>{time(b.dateCheckOut || b.dateCheckIn)}</td><td>{statuses[b.status]}</td><td>{b.estimated ? 'Chưa ghi thực thu' : money(b.totalPrice) + ' đ'}{b.status === 3 && <small>Đã hoàn {money(b.refundAmount)} đ</small>}</td><td>+{b.pointsEarned} / −{b.pointsRedeemed}</td></tr>)}</tbody></table></div>{!detail.bills.length && <p className="customers-empty">Chưa có hóa đơn liên kết với khách.</p>}<div className="customers-pagination"><span>{detail.billCount} hóa đơn · Trang {detail.billPage}</span><button disabled={busy || detail.billPage === 1} onClick={() => action(() => open(detail.customer.id, detail.billPage - 1, detail.pointPage))}>Trước</button><button disabled={busy || detail.billPage * 20 >= detail.billCount} onClick={() => action(() => open(detail.customer.id, detail.billPage + 1, detail.pointPage))}>Sau</button></div></>}
+    {detailTab === 'points' && <><p className="customers-rule">10.000đ thực trả = 1 điểm · 1 điểm = 100đ. Hóa đơn cũ không được tự cộng điểm hồi tố.</p><div className="customers-table-wrap"><table><thead><tr><th>Thời gian</th><th>Hóa đơn</th><th>Thao tác</th><th>Thay đổi</th><th>Số dư sau</th></tr></thead><tbody>{detail.points.map(p => <tr key={p.id}><td>{time(p.createdAt)}</td><td>HD{String(p.idBill).padStart(6, '0')}</td><td>{{ Earn: 'Tích điểm', Redeem: 'Đổi điểm', Refund: 'Điều chỉnh hoàn tiền' }[p.kind]}<small>{p.createdBy}</small></td><td className={p.delta < 0 ? 'customer-negative' : 'customer-points'}>{p.delta > 0 ? '+' : ''}{p.delta}</td><td>{p.balance}</td></tr>)}</tbody></table></div>{!detail.points.length && <p className="customers-empty">Chưa phát sinh tích hoặc đổi điểm.</p>}<div className="customers-pagination"><span>{detail.pointCount} giao dịch · Trang {detail.pointPage}</span><button disabled={busy || detail.pointPage === 1} onClick={() => action(() => open(detail.customer.id, detail.billPage, detail.pointPage - 1))}>Trước</button><button disabled={busy || detail.pointPage * 20 >= detail.pointCount} onClick={() => action(() => open(detail.customer.id, detail.billPage, detail.pointPage + 1))}>Sau</button></div></>}{error && <p className="customers-error">{error}</p>}</Modal>}
+    {groupModal && <Modal width={600} title="Nhóm khách hàng" onClose={() => { if (!busy) { setGroupModal(false); setGroupEdit(null); setGroupName('') } }}><div className="customers-group-editor"><input aria-label="Tên nhóm khách hàng" maxLength={100} placeholder="VD: Khách thường, VIP..." value={groupName} onChange={e => setGroupName(e.target.value)} /><button hidden={!can('CUSTOMERS_GROUPS')} className="primary" disabled={busy || !groupName.trim()} onClick={saveGroup}>{groupEdit ? 'Lưu nhóm' : 'Thêm nhóm'}</button>{groupEdit && <button onClick={() => { setGroupEdit(null); setGroupName('') }}>Hủy sửa</button>}</div>{groups.map(g => <div className="customers-group-row" key={g.id}><b>{g.name}</b><button hidden={!can('CUSTOMERS_GROUPS')} disabled={busy} onClick={() => { setGroupEdit(g.id); setGroupName(g.name) }}>Sửa</button><button hidden={!can('CUSTOMERS_GROUPS')} disabled={busy} onClick={() => action(async () => { await axios.delete(`/Customer/groups/${g.id}`); await loadGroups(); setGroupEdit(null); setGroupName('') })}>Xóa nhóm trống</button></div>)}<p>Chỉ xóa nhóm chưa có khách hàng. Khách ngừng hoạt động vẫn giữ nhóm.</p>{error && <p className="customers-error">{error}</p>}</Modal>}
+    {importData && <Modal width={750} title="Kiểm tra file khách hàng" onClose={() => { if (!busy) setImportData(null) }} footer={<><button disabled={busy} onClick={template}>Tải file mẫu</button><button hidden={!can('CUSTOMERS_IMPORT')} disabled={busy} onClick={() => action(async () => { const r = await axios.post("/Customer/import", { items: importData.items, preview: true }); setImportValid(r.data.valid); setImportErrors(r.data.errors) })}>Kiểm tra lại</button><button disabled={busy} onClick={() => setImportData(null)}>Đóng</button><button hidden={!can('CUSTOMERS_IMPORT')} className="primary" disabled={busy || !importValid} onClick={commitImport}>Nhập {importData.items.length} khách hàng</button></>}><p>{importData.name} · {importData.items.length} dòng</p><p>Điện thoại trong Excel nên để dạng văn bản để giữ số 0 đầu. Ngày sinh dạng YYYY-MM-DD. File chỉ thêm khách mới; không ghi đè dữ liệu hay điểm.</p>{busy ? <p>Đang kiểm tra dữ liệu...</p> : importValid ? <p className="customers-notice">Tất cả dòng hợp lệ. Có thể nhập.</p> : <p className="customers-error">Có lỗi trong file. Sửa file và chọn nhập lại.</p>}{importErrors.map((e, i) => <p className="customers-error" key={i}>Dòng {e.row}: {e.message}</p>)}<div className="customers-table-wrap"><table><thead><tr><th>Tên khách</th><th>Điện thoại</th><th>Email</th></tr></thead><tbody>{importData.items.slice(0, 10).map((c, i) => <tr key={i}><td>{c.name}</td><td>{c.phone}</td><td>{c.email || '—'}</td></tr>)}</tbody></table></div><small>Hiển thị tối đa 10 dòng xem trước.</small>{error && <p className="customers-error">{error}</p>}</Modal>}
+    <div className="customers-bottom"><span>Chưa có file nhập?</span><button onClick={template}>Tải file Excel mẫu</button></div>
+  </main>
 }
-
-export default Customers

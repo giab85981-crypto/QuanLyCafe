@@ -1,129 +1,37 @@
-import { useEffect, useMemo, useState } from 'react'
-import axiosClient from '../api/axiosClient'
-import { errMsg } from '../api/errMsg'
-import DateRange, { presets } from './DateRange'
-import './Page.css'
-
-const money = (n) => Number(n || 0).toLocaleString('vi-VN')
-const day = (iso) => new Date(iso).toLocaleDateString('vi-VN')
-
-function Cashbook() {
-  const [[from, to], setRange] = useState(presets.month())
-  const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    setLoading(true)
-    axiosClient
-      .get('/Report/revenue', { params: { fromDate: `${from}T00:00:00`, toDate: `${to}T23:59:59` } })
-      .then((r) => {
-        setRows([...r.data].sort((a, b) => new Date(a.date) - new Date(b.date)))
-        setError('')
-      })
-      .catch((e) => setError(errMsg(e, 'Không tải được sổ quỹ.')))
-      .finally(() => setLoading(false))
-  }, [from, to])
-
-  const sum = useMemo(
-    () =>
-      rows.reduce(
-        (s, r) => ({
-          revenue: s.revenue + r.totalRevenue,
-          cost: s.cost + r.totalCost,
-          profit: s.profit + r.totalProfit,
-          bills: s.bills + r.totalBills,
-        }),
-        { revenue: 0, cost: 0, profit: 0, bills: 0 },
-      ),
-    [rows],
-  )
-
-  // Xuất CSV (thêm BOM để Excel đọc đúng tiếng Việt)
-  const exportCsv = () => {
-    const lines = [['Ngày', 'Số hóa đơn', 'Tiền thu', 'Giá vốn', 'Chênh lệch']]
-    rows.forEach((r) => lines.push([day(r.date), r.totalBills, r.totalRevenue, r.totalCost, r.totalProfit]))
-    lines.push(['Tổng', sum.bills, sum.revenue, sum.cost, sum.profit])
-    const csv = '\uFEFF' + lines.map((l) => l.join(',')).join('\n')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    a.download = `so-quy_${from}_${to}.csv`
-    a.click()
-    URL.revokeObjectURL(a.href)
-  }
-
-  return (
-    <div className="pg">
-      <div className="pg-head">
-        <h1>Sổ quỹ</h1>
-        <div className="pg-tools">
-          <DateRange from={from} to={to} onChange={(f, t) => setRange([f, t])} />
-          <button className="pg-btn" onClick={exportCsv} disabled={rows.length === 0}>Xuất CSV</button>
-        </div>
-      </div>
-
-      {error && <div className="pg-error">{error}</div>}
-
-      <div className="pg-stats">
-        <div className="pg-card pg-stat pg-stat--green">
-          <div className="pg-stat__label">Tổng thu</div>
-          <div className="pg-stat__value">{money(sum.revenue)}</div>
-        </div>
-        <div className="pg-card pg-stat pg-stat--amber">
-          <div className="pg-stat__label">Giá vốn</div>
-          <div className="pg-stat__value">{money(sum.cost)}</div>
-        </div>
-        <div className="pg-card pg-stat">
-          <div className="pg-stat__label">Chênh lệch (thu − vốn)</div>
-          <div className="pg-stat__value">{money(sum.profit)}</div>
-        </div>
-      </div>
-
-      <div className="pg-card pg-table-wrap">
-        <table className="pg-table">
-          <thead>
-            <tr>
-              <th>Ngày</th>
-              <th className="num">Số hóa đơn</th>
-              <th className="num">Tiền thu</th>
-              <th className="num">Giá vốn</th>
-              <th className="num">Chênh lệch</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <tr><td colSpan="5" className="pg-empty">Đang tải...</td></tr>}
-            {!loading && rows.length === 0 && !error && (
-              <tr><td colSpan="5" className="pg-empty">Không có giao dịch nào trong khoảng ngày này.</td></tr>
-            )}
-            {rows.map((r) => (
-              <tr key={r.date}>
-                <td>{day(r.date)}</td>
-                <td className="num">{r.totalBills}</td>
-                <td className="num">{money(r.totalRevenue)}</td>
-                <td className="num">{money(r.totalCost)}</td>
-                <td className="num">{money(r.totalProfit)}</td>
-              </tr>
-            ))}
-          </tbody>
-          {rows.length > 0 && (
-            <tfoot>
-              <tr>
-                <td>Tổng</td>
-                <td className="num">{sum.bills}</td>
-                <td className="num">{money(sum.revenue)}</td>
-                <td className="num">{money(sum.cost)}</td>
-                <td className="num">{money(sum.profit)}</td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
-      </div>
-
-      <p className="pg-note">
-        Số liệu tính từ các hóa đơn đã thanh toán. Backend chưa có API phiếu thu/phiếu chi riêng nên chưa ghi được khoản thu chi ngoài bán hàng.
-      </p>
-    </div>
-  )
+import { can, useAccess } from '../utils/staffAccess'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import api from '../api/axiosClient'
+import Modal from '../components/Modal'
+import { WarehouseTable, Method } from '../components/WarehouseUi'
+import { money, date, day, exportSheet, errorText } from '../utils/warehouse'
+import './Menu.css'
+import './Inventory.css'
+export default function Cashbook() {
+  useAccess()
+  const [from, setFrom] = useState(day(new Date(new Date().getFullYear(), new Date().getMonth(), 1))), [to, setTo] = useState(day()), [data, setData] = useState({ rows: [], totalIn: 0, totalOut: 0 }), [loading, setLoading] = useState(true), [error, setError] = useState(''), [search, setSearch] = useState(''), [direction, setDirection] = useState(''), [method, setMethod] = useState(''), [form, setForm] = useState(null), [busy, setBusy] = useState(false), [formError, setFormError] = useState(''), [page, setPage] = useState(1)
+  const request = useRef(0)
+  const load = useCallback(async () => { const id = ++request.current; setLoading(true); try { const response = await api.get('/Cashbook', { params: { from, to } }); if (id === request.current) { setData(response.data); setError('') } } catch (e) { if (id === request.current) setError(errorText(e)) } finally { if (id === request.current) setLoading(false) } }, [from, to])
+  useEffect(() => { load(); return () => { request.current++ } }, [load])
+  const choose = (setter, value) => { setPage(1); setter(value) }
+  const refresh = () => { setLoading(true); void load() }
+  const open = value => { setFormError(''); setForm({ direction: value, category: value === 'In' ? 'Thu khác' : 'Chi khác', amount: 0, paymentMethod: 'Cash', note: '', requestKey: crypto.randomUUID() }) }
+  const patch = value => setForm(f => ({ ...f, ...value }))
+  const save = async () => { if (busy) return; setBusy(true); try { await api.post('/Cashbook', form); setForm(null); await load() } catch (e) { setFormError(errorText(e)) } finally { setBusy(false) } }
+  const rows = data.rows.filter(r => (!direction || r.direction === direction) && (!method || r.paymentMethod === method) && JSON.stringify([r.id, r.note, r.category, r.supplierName, r.reference]).toLocaleLowerCase('vi').includes(search.toLocaleLowerCase('vi')))
+  const filteredIn = rows.filter(r => !r.legacy && r.direction === 'In').reduce((a, r) => a + r.amount, 0), filteredOut = rows.filter(r => !r.legacy && r.direction === 'Out').reduce((a, r) => a + r.amount, 0)
+  const pages = Math.max(1, Math.ceil(rows.length / 20)), currentPage = Math.min(page, pages), shown = rows.slice((currentPage - 1) * 20, currentPage * 20)
+  const methodName = value => value === 'Cash' ? 'Tiền mặt' : value === 'Transfer' ? 'Chuyển khoản' : 'Chưa ghi nhận'
+  const exportData = () => exportSheet(rows.map(r => ({ 'Mã': r.id, 'Thời gian': date(r.date), 'Loại': r.direction === 'In' ? 'Thu' : 'Chi', 'Danh mục': r.category, 'Nội dung': r.note, 'Số tiền': r.amount, 'Phương thức': methodName(r.paymentMethod), 'Tham chiếu': r.reference, 'Nhà cung cấp': r.supplierName, 'Người lập': r.createdBy, 'Ca': r.idShift ? 'CA' + String(r.idShift).padStart(6, '0') : 'Ngoài ca', 'Ghi nhận': r.legacy ? 'Chưa có phiếu thu' : 'Đã ghi sổ' })), 'So-quy-' + from + '-' + to)
+  return <main className="menu-catalog warehouse cashbook"><div className="mc-heading"><div><span className="mc-eyebrow">DÒNG TIỀN CỦA QUÁN</span><h1>Sổ quỹ</h1><p>Tiền thực thu, thực chi và thanh toán nhà cung cấp.</p></div><div className="mc-toolbar"><button hidden={!can('CASHBOOK_CREATE')} disabled={!can('CASHBOOK_CREATE')} onClick={() => open('In')}>+ Phiếu thu</button><button hidden={!can('CASHBOOK_CREATE')} className="mc-primary" disabled={!can('CASHBOOK_CREATE')} onClick={() => open('Out')}>+ Phiếu chi</button></div></div>
+    {error && <div className="wh-alert">{error}<button onClick={refresh}>Thử lại</button></div>}
+    <div className="mc-stats"><div><span>Tổng thu trong kỳ</span><b>{money(data.totalIn)}</b></div><div><span>Tổng chi trong kỳ</span><b>{money(data.totalOut)}</b></div><div><span>Chênh lệch thu − chi trong kỳ</span><b>{money(data.totalIn - data.totalOut)}</b></div></div>
+        <section className="mc-main"><div className="mc-listbar"><b>Đối chiếu theo phương thức</b><span>Lũy kế từ giao dịch đầu tiên đã ghi sổ</span></div><WarehouseTable empty={!data.methods?.length} headers={['Phương thức', 'Lũy kế trước kỳ', 'Thu trong kỳ', 'Chi trong kỳ', 'Lũy kế cuối kỳ']}>{data.methods?.map(c => <tr key={c.paymentMethod}><td>{methodName(c.paymentMethod)}</td><td>{money(c.opening)}</td><td className="wh-positive">{money(c.totalIn)}</td><td className="wh-negative">{money(c.totalOut)}</td><td><b>{money(c.closing)}</b></td></tr>)}</WarehouseTable></section>
+    {data.legacyAmount > 0 && <p className="wh-help">Có {money(data.legacyAmount)} từ hóa đơn cũ chưa có phiếu thu, hiển thị để đối chiếu và không cộng vào tổng tiền đã ghi sổ.</p>}
+    <section className="mc-main"><div className="mc-filters"><label>Từ ngày <input aria-label="Từ ngày" type="date" value={from} onChange={e => { setLoading(true); choose(setFrom, e.target.value) }}/></label><label>Đến ngày <input aria-label="Đến ngày" type="date" value={to} onChange={e => { setLoading(true); choose(setTo, e.target.value) }}/></label><input placeholder="Tìm mã, nội dung, nhà cung cấp..." value={search} onChange={e => choose(setSearch, e.target.value)}/><select value={direction} onChange={e => choose(setDirection, e.target.value)}><option value="">Thu & chi</option><option value="In">Phiếu thu</option><option value="Out">Phiếu chi</option></select><select value={method} onChange={e => choose(setMethod, e.target.value)}><option value="">Mọi phương thức</option><option value="Cash">Tiền mặt</option><option value="Transfer">Chuyển khoản</option><option value="Unknown">Chưa ghi nhận</option></select></div>
+      <div className="mc-listbar"><span>{rows.length} bản ghi • Thu theo bộ lọc: {money(filteredIn)} • Chi: {money(filteredOut)}</span><div><button onClick={refresh}>Làm mới</button><button onClick={exportData}>Xuất Excel</button></div></div>
+      {loading ? <div className="mc-empty">Đang tải Sổ quỹ...</div> : <WarehouseTable empty={!shown.length} headers={['Mã / thời gian', 'Loại', 'Nội dung', 'Số tiền', 'Phương thức', 'Tham chiếu / người lập']}>{shown.map(r => <tr key={r.id}><td><b>{r.id}</b><small>{date(r.date)}</small></td><td><span className={r.direction === 'In' ? 'wh-positive' : 'wh-negative'}>{r.direction === 'In' ? 'Thu' : 'Chi'}</span><small>{r.category}</small></td><td>{r.note}<small>{r.supplierName}{r.legacy && ' • Chưa có phiếu thu'}{r.estimated && ' • Doanh thu cũ được ước tính từ dữ liệu còn lại'}</small></td><td className={r.direction === 'In' ? 'wh-positive' : 'wh-negative'}>{money(r.amount)}</td><td>{methodName(r.paymentMethod)}</td><td>{r.reference || 'Phiếu thủ công'}<small>{r.createdBy} · {r.idShift ? `CA${String(r.idShift).padStart(6, '0')}` : 'Ngoài ca'}</small></td></tr>)}</WarehouseTable>}
+      <div className="mc-pagination"><span>Trang {currentPage}/{pages}</span><button disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Trước</button><button disabled={currentPage === pages} onClick={() => setPage(currentPage + 1)}>Sau</button></div>
+    </section><p className="wh-help">Phiếu nhập chỉ ghi chi phần đã trả; công nợ chưa trả chưa tính vào tổng chi. Thu bán hàng ghi tự động khi thanh toán hóa đơn. Hóa đơn cũ hiển thị phương thức chưa ghi nhận. Lũy kế chưa phải số dư thực tế nếu chưa ghi nhận tiền ban đầu. Dữ liệu cũ chưa có phiếu thu không cộng vào tổng đã ghi sổ.</p>
+    {form && <Modal title={form.direction === 'In' ? 'Lập phiếu thu' : 'Lập phiếu chi'} onClose={() => { if (!busy) setForm(null) }} width={620} footer={<><button disabled={busy} onClick={() => setForm(null)}>Đóng</button><button hidden={!can('CASHBOOK_CREATE')} className="btn btn-primary" disabled={busy} onClick={save}>{busy ? 'Đang ghi sổ...' : 'Xác nhận & ghi sổ'}</button></>}><div className="wh-form">{formError && <div className="wh-alert">{formError}</div>}<label>Loại thu / chi<input value={form.category} onChange={e => patch({ category: e.target.value })}/></label><div className="wh-fields"><label>Số tiền<input type="number" min="1" value={form.amount} onChange={e => patch({ amount: Number(e.target.value) })}/></label><label>Phương thức<Method value={form.paymentMethod} onChange={paymentMethod => patch({ paymentMethod })}/></label></div><label>Nội dung (bắt buộc)<textarea value={form.note} onChange={e => patch({ note: e.target.value })}/></label><p className="wh-help">Trả nợ nhà cung cấp tại Kho hàng → Nhập hàng → Trả nợ để liên kết đúng phiếu nhập. Phiếu thủ công không thay đổi công nợ. Phiếu được gắn vào ca đang mở của người lập; nếu chưa mở ca thì ghi ngoài ca.</p></div></Modal>}
+  </main>
 }
-
-export default Cashbook

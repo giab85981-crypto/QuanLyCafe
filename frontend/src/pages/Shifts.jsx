@@ -1,0 +1,57 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import api from '../api/axiosClient'
+import { can, canOpen, useAccess } from '../utils/staffAccess'
+import { money, date, day, errorText, exportSheet } from '../utils/warehouse'
+import Modal from '../components/Modal'
+import './Shifts.css'
+const code = id => `CA${String(id).padStart(6, '0')}`
+const methods = { Cash: 'Tiền mặt', Transfer: 'Chuyển khoản', Unknown: 'Chưa rõ phương thức' }
+export default function Shifts() {
+  const user = useAccess(), navigate = useNavigate()
+  const [data, setData] = useState({rows:[],total:0,current:null}), [detail, setDetail] = useState(null), [loading, setLoading] = useState(true), [error, setError] = useState(''), [busy, setBusy] = useState(false), [notice, setNotice] = useState('')
+  const [from, setFrom] = useState(day(new Date(Date.now() - 30 * 86400000))), [to, setTo] = useState(day()), [status, setStatus] = useState(''), [account, setAccount] = useState(''), [page, setPage] = useState(1), [reload, setReload] = useState(0)
+  const [form, setForm] = useState(null), [formError, setFormError] = useState('')
+  useEffect(() => { setDetail(null); setForm(null) }, [user.userName,user.roleName,JSON.stringify(user.permissions)])
+  useEffect(() => {
+    let active = true; setLoading(true); setError('')
+    api.get('/Shift', {params:{from,to,status:status || undefined,userName:account || undefined,page}}).then(r => { if(active) setData(r.data) }).catch(e => { if(active) setError(errorText(e)) }).finally(() => { if(active) setLoading(false) })
+    return () => { active = false }
+  }, [from,to,status,account,page,reload,user.roleName,JSON.stringify(user.permissions)])
+  async function openDetail(id) { try { setError(''); const r = await api.get(`/Shift/${id}`); setDetail(r.data) } catch(e) { setError(errorText(e)) } }
+  function refresh() { setReload(v => v + 1); if(detail) void openDetail(detail.id) }
+  const allowedClose = detail && !detail.closedAt && (can('SHIFT_CLOSE_OTHER') || detail.userName === user.userName && can('SHIFT_SELF'))
+  function openForm() { setFormError(''); setForm({kind:'open',openingCash:'',note:'',requestKey:crypto.randomUUID()}) }
+  async function closeForm() { const r = await api.get(`/Shift/${detail.id}`); setDetail(r.data); if(r.data.closedAt) return; setFormError(''); setForm({kind:'close',id:detail.id,countedCash:'',expectedCash:r.data.totals.expectedCash,note:''}) }
+  async function save() {
+    if(busy) return
+    if((form.kind === 'open' ? form.openingCash : form.countedCash) === '') return setFormError('Hãy nhập số tiền, nhập 0 nếu không có tiền mặt.')
+    setBusy(true); setFormError('')
+    try {
+      const r = form.kind === 'open' ? await api.post('/Shift', {...form,openingCash:Number(form.openingCash)}) : await api.post(`/Shift/${form.id}/close`, {...form,countedCash:Number(form.countedCash)})
+      const id = form.kind === 'open' ? r.data.id : form.id
+      setForm(null); setNotice(form.kind === 'open' ? 'Đã mở ca. Các khoản thu chi của bạn sẽ được gắn vào ca này.' : 'Đã chốt ca, số liệu đối chiếu được lưu cố định.'); setReload(v => v + 1); await openDetail(id)
+    } catch(e) { setFormError(errorText(e)) } finally { setBusy(false) }
+  }
+  const exportEntries = () => exportSheet(detail.entries.map(c => ({'Ca':code(detail.id),'Người thực hiện':c.createdBy,'Thời gian':date(c.createdAt),'Loại':c.direction === 'In' ? 'Thu' : 'Chi','Danh mục':c.category,'Phương thức':methods[c.paymentMethod] || c.paymentMethod,'Số tiền':c.amount,'Nội dung':c.note,'Hóa đơn':c.idBill ? `HD${String(c.idBill).padStart(6,'0')}` : ''})),code(detail.id))
+  return <main className="shift-page">
+    <div className="shift-heading"><div><span>THU NGÂN & ĐỐI CHIẾU</span><h1>Ca làm việc</h1><p>Mỗi tài khoản một ca mở. Kiểm đếm tiền mặt trước khi bàn giao.</p></div><div className="shift-toolbar">{canOpen('/pos') && <button onClick={() => navigate('/pos')}>Về bán hàng</button>}<button onClick={refresh}>Làm mới</button>{can('SHIFT_SELF') && <button className="primary" disabled={busy || !!data.current} onClick={openForm}>+ Mở ca của tôi</button>}</div></div>
+    {error && <p className="shift-error" role="alert">{error}</p>}{notice && <p className="shift-notice" role="status">{notice}</p>}
+    <div className="shift-active">{data.current ? <><div><b>Bạn đang làm việc trong {code(data.current)}</b><p>Đăng xuất không tự chốt ca. Hãy kiểm đếm và chốt trước khi bàn giao.</p></div><button onClick={() => openDetail(data.current)}>Xem ca hiện tại</button></> : <><div><b>Bạn chưa mở ca</b><p>Cần mở ca trước khi thanh toán hóa đơn. Nếu thiếu nút mở ca, quản trị viên cần cấp quyền “Xem / mở / chốt ca của mình”.</p></div></>}</div>
+    <section className="shift-history"><div className="shift-filters"><label>Từ ngày<input type="date" value={from} max={to} onChange={e => { if(e.target.value) {setFrom(e.target.value);setPage(1)} }}/></label><label>Đến ngày<input type="date" value={to} min={from} onChange={e => { if(e.target.value) {setTo(e.target.value);setPage(1)} }}/></label><label>Trạng thái<select value={status} onChange={e => {setStatus(e.target.value);setPage(1)}}><option value="">Tất cả</option><option value="open">Đang mở</option><option value="closed">Đã chốt</option></select></label>{can('SHIFT_VIEW') && <label>Tài khoản<input placeholder="Tên đăng nhập chính xác" value={account} onChange={e => {setAccount(e.target.value);setPage(1)}}/></label>}</div>
+      <div className="shift-table-wrap"><table><thead><tr><th>Ca / nhân viên</th><th>Mở / chốt</th><th>Đầu ca</th><th>Tiền dự kiến</th><th>Thực đếm</th><th>Chênh lệch</th><th>Trạng thái</th></tr></thead><tbody>{loading ? <tr><td colSpan={7}>Đang tải ca làm việc...</td></tr> : data.rows.map(s => <tr key={s.id}><td><button className="link" onClick={() => openDetail(s.id)}>{code(s.id)}</button><small>{s.name || s.userName} · {s.userName}</small></td><td>{date(s.openedAt)}<small>{s.closedAt ? date(s.closedAt) : 'Chưa chốt'}</small></td><td>{money(s.openingCash)}</td><td>{s.expectedCash == null ? 'Xem chi tiết' : money(s.expectedCash)}</td><td>{s.countedCash == null ? '—' : money(s.countedCash)}</td><td className={s.difference ? 'negative' : ''}>{s.difference == null ? '—' : money(s.difference)}</td><td><span className={`shift-badge ${s.closedAt ? 'closed' : ''}`}>{s.closedAt ? 'Đã chốt' : 'Đang mở'}</span></td></tr>)}{!loading && !data.rows.length && <tr><td colSpan={7}>Chưa có ca trong khoảng ngày này.</td></tr>}</tbody></table></div><div className="shift-pagination"><span>{data.total} ca · Trang {page}/{Math.max(1,Math.ceil(data.total/20))}</span><button disabled={page === 1} onClick={() => setPage(p => p - 1)}>Trước</button><button disabled={page*20 >= data.total} onClick={() => setPage(p => p + 1)}>Sau</button></div>
+    </section>
+    {detail && <section className="shift-detail"><div className="shift-detail-heading"><div><span className={`shift-badge ${detail.closedAt ? 'closed' : ''}`}>{detail.closedAt ? 'Đã chốt' : 'Đang mở'}</span><h2>{code(detail.id)} · {detail.name || detail.userName}</h2><p>{date(detail.openedAt)} → {detail.closedAt ? date(detail.closedAt) : 'Đang làm việc'}</p></div><div className="shift-toolbar"><button onClick={() => openDetail(detail.id)}>Cập nhật ca</button><button onClick={exportEntries}>Xuất giao dịch</button><button onClick={() => window.print()}>In đối chiếu</button>{allowedClose && <button className="primary" disabled={busy} onClick={() => closeForm().catch(e => setError(errorText(e)))}>Chốt ca</button>}<button onClick={() => setDetail(null)}>Đóng chi tiết</button></div></div>
+      <div className="shift-stats"><article><span>Tiền đầu ca</span><b>{money(detail.openingCash)}</b></article><article><span>Hóa đơn thanh toán trong ca</span><b>{detail.totals.bills} hóa đơn</b><small>{money(detail.totals.sales)} sau giảm giá / đổi điểm</small></article><article><span>Hoàn tiền đã chi trong ca</span><b>{money(detail.totals.refunds)}</b></article><article><span>Tiền mặt dự kiến</span><b>{money(detail.totals.expectedCash)}</b></article></div>
+      <p className="shift-help">Tiền mặt dự kiến = tiền đầu ca + thu tiền mặt − chi tiền mặt. Chuyển khoản được thống kê riêng. Tiền đầu ca không tạo phiếu thu mới. Hóa đơn hoàn vào ca khác giữ doanh số ca bán, tiền hoàn ghi ở ca thực hiện hoàn.</p>
+      <div className="shift-table-wrap"><table><thead><tr><th>Phương thức</th><th>Thu</th><th>Chi</th><th>Chênh lệch thu − chi</th></tr></thead><tbody>{detail.totals.methods.map(m => <tr key={m.paymentMethod}><td>{methods[m.paymentMethod] || m.paymentMethod}</td><td>{money(m.totalIn)}</td><td>{money(m.totalOut)}</td><td>{money(m.totalIn - m.totalOut)}</td></tr>)}</tbody></table></div>
+      {detail.closedAt && <div className="shift-reconciliation"><span>Thực đếm <b>{money(detail.countedCash)}</b></span><span>Chênh lệch <b className={detail.difference ? 'negative' : ''}>{money(detail.difference)}</b></span><p>Chốt bởi: {detail.closedBy} · {date(detail.closedAt)}</p><p>Lý do / ghi chú: {detail.closingNote || 'Không có chênh lệch'}</p></div>}
+      {detail.openingNote && <p className="shift-help">Ghi chú mở ca: {detail.openingNote}</p>}
+      <h3>Giao dịch trong ca ({detail.entries.length})</h3><div className="shift-table-wrap"><table><thead><tr><th>Thời gian / người lập</th><th>Loại</th><th>Nội dung</th><th>Phương thức</th><th>Số tiền</th></tr></thead><tbody>{detail.entries.map(c => <tr key={c.id}><td>{date(c.createdAt)}<small>{c.createdBy}</small></td><td>{c.direction === 'In' ? 'Thu' : 'Chi'}<small>{c.category}</small></td><td>{c.note}{c.idBill && <small>HD{String(c.idBill).padStart(6,'0')}</small>}</td><td>{methods[c.paymentMethod] || c.paymentMethod}</td><td>{money(c.amount)}</td></tr>)}{!detail.entries.length && <tr><td colSpan={5}>Ca chưa có giao dịch tiền.</td></tr>}</tbody></table></div>
+    </section>}
+    {form && <Modal width={580} title={form.kind === 'open' ? 'Mở ca của tôi' : `Chốt ${code(form.id)}`} onClose={() => {if(!busy) setForm(null)}} footer={<><button disabled={busy} onClick={() => setForm(null)}>Quay lại</button><button className="primary" disabled={busy || (form.kind === 'open' ? !can('SHIFT_SELF') : !allowedClose)} onClick={save}>{busy ? 'Đang lưu...' : form.kind === 'open' ? 'Xác nhận mở ca' : 'Xác nhận chốt ca'}</button></>}>
+      <div className="shift-form">{formError && <p className="shift-error">{formError}</p>}{form.kind === 'close' && <div className="shift-close-preview"><span>Tiền mặt dự kiến</span><b>{money(form.expectedCash)}</b><p>Chênh lệch sau kiểm đếm: <strong>{form.countedCash === '' ? 'Chưa nhập' : money(Number(form.countedCash) - form.expectedCash)}</strong></p></div>}
+      <label>{form.kind === 'open' ? 'Tiền mặt đầu ca' : 'Tiền mặt thực đếm'}<input autoFocus type="number" min="0" max="999999999999" step="0.01" value={form.kind === 'open' ? form.openingCash : form.countedCash} onChange={e => setForm(f => ({...f,[f.kind === 'open' ? 'openingCash' : 'countedCash']:e.target.value}))}/></label><label>{form.kind === 'open' ? 'Ghi chú mở ca' : 'Lý do chênh lệch / ghi chú'}<textarea maxLength={500} value={form.note} onChange={e => setForm(f => ({...f,note:e.target.value}))}/></label><p className="shift-help">{form.kind === 'open' ? 'Nhập số tiền mặt thực có để bắt đầu ca. Mỗi nhân viên cần tự mở ca trên tài khoản của mình.' : 'Bắt buộc ghi lý do khi thực đếm lệch với dự kiến. Ca đã chốt không thể sửa hoặc nhận thêm giao dịch.'}</p></div>
+    </Modal>}
+  </main>
+}

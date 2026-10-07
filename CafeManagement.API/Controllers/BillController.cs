@@ -1,13 +1,14 @@
-﻿using CafeManagement.API.Data;
+using CafeManagement.API.Data;
 using CafeManagement.API.DTOs;
 using CafeManagement.API.Entities;
+using CafeManagement.API.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace CafeManagement.API.Controllers
 {
     [Route("api/[controller]")]
-    [ApiController]
+    [ApiController, Microsoft.AspNetCore.Authorization.Authorize]
     public class BillController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -22,6 +23,7 @@ namespace CafeManagement.API.Controllers
         {
             var bill = await _context.Bills
                 .Include(b => b.TableFood)
+                .Include(b => b.Customer)
                 .Include(b => b.BillInfos)
                 .ThenInclude(bi => bi.Food)
                 .FirstOrDefaultAsync(b => b.IdTable == tableId && b.Status == 0);
@@ -31,16 +33,20 @@ namespace CafeManagement.API.Controllers
             var result = new BillDetailDto
             {
                 IdBill = bill.Id,
+                Customer = bill.Customer == null ? null : CafeManagement.API.Services.CustomerCatalog.Dto(bill.Customer),
                 IdTable = bill.IdTable,
-                TableName = bill.TableFood.Name,
+                TableName = bill.TableNameSnapshot != "" ? bill.TableNameSnapshot : bill.TableFood!.Name,
+                OrderType = bill.OrderType,
                 DateCheckIn = bill.DateCheckIn,
                 Status = bill.Status,
                 Discount = bill.Discount,
-                Items = bill.BillInfos.Select(bi => new BillInfoDto
+                GuestCount = bill.GuestCount,
+                Items = bill.BillInfos.Where(bi => bi.Count > 0).Select(bi => new BillInfoDto
                 {
+                    IdBillInfo = bi.Id, SentCount = bi.SentCount, IdVariant = bi.IdVariant, OptionLabel = bi.OptionLabel,
                     IdFood = bi.IdFood,
-                    FoodName = bi.Food.Name,
-                    Price = bi.Food.Price,
+                    FoodName = bi.FoodNameSnapshot != "" ? bi.FoodNameSnapshot : bi.Food.Name,
+                    Price = bi.UnitPrice ?? bi.Food.Price,
                     CostPrice = bi.CostPrice,
                     Count = bi.Count
                 }).ToList()
@@ -50,84 +56,89 @@ namespace CafeManagement.API.Controllers
         }
 
         [HttpPost("add-item")]
-        public async Task<IActionResult> AddItemToBill([FromBody] AddFoodToBillDto dto)
+        public async Task<IActionResult> AddItemToBill(AddFoodToBillDto dto)
         {
-            var table = await _context.TableFoods.FindAsync(dto.IdTable);
-            if (table == null) return NotFound("Không tìm thấy bàn!");
-
-            var food = await _context.Foods.FindAsync(dto.IdFood);
-            if (food == null) return NotFound("Không tìm thấy món ăn!");
-
-            var bill = await _context.Bills
-                .FirstOrDefaultAsync(b => b.IdTable == dto.IdTable && b.Status == 0);
-
-            if (bill == null)
-            {
-                bill = new Bill
-                {
-                    IdTable = dto.IdTable,
-                    DateCheckIn = DateTime.Now,
-                    Status = 0
-                };
-                _context.Bills.Add(bill);
-                await _context.SaveChangesAsync();
-
-                table.Status = "Có người";
-            }
-
-            var billInfo = await _context.BillInfos
-                .FirstOrDefaultAsync(bi => bi.IdBill == bill.Id && bi.IdFood == dto.IdFood);
-
-            if (billInfo == null)
-            {
-                if (dto.Count > 0)
-                {
-                    billInfo = new BillInfo
-                    {
-                        IdBill = bill.Id,
-                        IdFood = dto.IdFood,
-                        Count = dto.Count,
-                        CostPrice = food.CostPrice
-                    };
-                    _context.BillInfos.Add(billInfo);
-                }
-            }
-            else
-            {
-                int newCount = billInfo.Count + dto.Count;
-                if (newCount > 0)
-                {
-                    billInfo.Count = newCount;
-                    billInfo.CostPrice = food.CostPrice;
-                }
-                else
-                {
-                    _context.BillInfos.Remove(billInfo);
-                }
-            }
-
+            try { return Ok(new { idBill = await new CafeManagement.API.Services.OrderFlow(_context).Add(dto, HttpContext?.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "system") }); }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+        }
+        [HttpPost("items/{lineId}/cancel")]
+        public async Task<IActionResult> CancelItem(int lineId, CancelBillItemDto dto)
+        {
+            try { await new CafeManagement.API.Services.OrderFlow(_context).Cancel(lineId, dto, HttpContext?.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "system"); return Ok(); }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+        }
+        [HttpPost("{billId}/close-empty")]
+        public async Task<IActionResult> CloseEmpty(int billId)
+        {
+            await using var transaction = _context.Database.CurrentTransaction == null ? await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
+            await new StockReservations(_context).Lock();
+            var bill = await _context.Bills.Include(b => b.TableFood).Include(b => b.BillInfos).FirstOrDefaultAsync(b => b.Id == billId && b.Status == 0);
+            if (bill == null) return NotFound();
+            if (bill.BillInfos.Any(i => i.Count > 0)) return BadRequest("Hãy hủy toàn bộ món trước khi đóng bàn trống.");
+            bill.Status = 2; bill.DateCheckOut = DateTime.Now; if (bill.TableFood != null) bill.TableFood.Status = "Trống";
+            await _context.SaveChangesAsync(); if (transaction != null) await transaction.CommitAsync(); return Ok();
+        }
+        [HttpPut("{billId}/guests")]
+        public async Task<IActionResult> UpdateGuests(int billId, [FromBody] UpdateGuestCountDto dto)
+        {
+            var bill = await _context.Bills.FirstOrDefaultAsync(b => b.Id == billId && b.Status == 0);
+            if (bill == null) return NotFound("Không tìm thấy hóa đơn đang phục vụ.");
+            bill.GuestCount = dto.GuestCount;
             await _context.SaveChangesAsync();
-            return Ok(new { message = "Cập nhật món thành công!", idBill = bill.Id });
+            return Ok(new { bill.GuestCount });
         }
 
+        [HttpPut("{billId}/customer")]
+        public async Task<IActionResult> SetCustomer(int billId, BillCustomerWrite dto)
+        {
+            await using var tx = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            var bill = await _context.Bills.SingleOrDefaultAsync(b => b.Id == billId && b.Status == 0);
+            if (bill == null) return NotFound("Đơn không còn phục vụ.");
+            if (dto.IdCustomer.HasValue && !await _context.Customers.AnyAsync(c => c.Id == dto.IdCustomer && c.IsActive)) return BadRequest("Khách đã ngừng hoạt động hoặc không tồn tại.");
+            bill.IdCustomer = dto.IdCustomer; await _context.SaveChangesAsync(); await tx.CommitAsync(); return Ok();
+        }
         [HttpPost("checkout/{billId}")]
         public async Task<IActionResult> Checkout(int billId, [FromBody] CheckoutDto dto)
         {
+            if (HttpContext?.User.Identity?.IsAuthenticated == true && (dto.Discount > 0 || dto.RedeemPoints > 0) && !DynamicAccess.Has(User, "POS_DISCOUNT")) return Forbid();
+            if (dto.Discount < 0 || dto.Discount > 100 || dto.GuestCount < 1 || dto.GuestCount > 1000) return BadRequest("Giảm giá hoặc số khách không hợp lệ.");
+            if (dto.PaymentMethod != "Cash" && dto.PaymentMethod != "Transfer") return BadRequest("Phương thức thanh toán không hợp lệ.");
+            await using var transaction = _context.Database.CurrentTransaction == null ? await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable) : null;
+            await new StockReservations(_context).Lock();
             var bill = await _context.Bills
                 .Include(b => b.TableFood)
+                .Include(b => b.BillInfos).ThenInclude(i => i.Food)
                 .FirstOrDefaultAsync(b => b.Id == billId && b.Status == 0);
 
             if (bill == null) return NotFound("Không tìm thấy hóa đơn cần thanh toán!");
+            if (!bill.BillInfos.Any(i => i.Count > 0))
+                return BadRequest("Hóa đơn chưa có món để thanh toán.");
+
+            try { bill.IdShift = await new ShiftFlow(_context).ActiveId(HttpContext?.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "system", HttpContext?.User.Identity?.IsAuthenticated == true); }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+
+            try { await new OrderFlow(_context).Send(billId, HttpContext?.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "system"); }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+            foreach (var item in bill.BillInfos)
+                item.UnitPrice ??= item.Food.Price;
+            bill.TotalPrice = Math.Round(bill.BillInfos.Sum(i => i.Count * i.UnitPrice!.Value)
+                * (100 - dto.Discount) / 100m, 2, MidpointRounding.AwayFromZero);
+            bill.GuestCount = dto.GuestCount ?? bill.GuestCount;
 
             bill.Status = 1;
+            bill.PaymentMethod = dto.PaymentMethod; bill.PaidBy = HttpContext?.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "system";
+            if (bill.TableFood != null) bill.TableNameSnapshot = bill.TableFood.Name;
             bill.DateCheckOut = DateTime.Now;
             bill.Discount = dto.Discount;
-            bill.IdCustomer = dto.IdCustomer;
+            try { await new CafeManagement.API.Services.CustomerLoyalty(_context).Checkout(bill, dto.IdCustomer, dto.RedeemPoints, bill.PaidBy); }
+            catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
 
-            bill.TableFood.Status = "Trống";
+            if (bill.TableFood != null) bill.TableFood.Status = "Trống";
 
+            if (bill.TotalPrice > 0) _context.CashEntries.Add(new CafeManagement.API.Entities.CashEntry { IdShift = bill.IdShift, IdBill = bill.Id, Direction = "In", Category = "Bán hàng", Amount = bill.TotalPrice, PaymentMethod = dto.PaymentMethod, Note = $"Thanh toán HD{bill.Id:D6}", CreatedBy = HttpContext?.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "system" });
             await _context.SaveChangesAsync();
-            return Ok(new { message = "Thanh toán hóa đơn thành công!" });
+            if (transaction != null) await transaction.CommitAsync();
+            return Ok(new { message = "Thanh toán hóa đơn thành công!", bill.TotalPrice, bill.PointsEarned, bill.PointsRedeemed });
         }
     }
 }

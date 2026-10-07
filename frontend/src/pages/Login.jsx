@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Coffee, Eye, EyeOff, LayoutDashboard, ShoppingCart } from 'lucide-react';
 import authApi from '../api/authApi';
+import { canOpen, landing } from '../utils/staffAccess';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -38,10 +39,11 @@ const Login = () => {
       localStorage.setItem('user', JSON.stringify({ userName, displayName, roleName, permissions }));
 
       // Chuyển hướng tới trang tương ứng (Dashboard hoặc POS)
-      navigate(targetPath);
+      const user = { userName, displayName, roleName, permissions };
+      navigate(canOpen(targetPath, user) ? targetPath : landing(user));
     } catch (err) {
       if (err.response && err.response.status === 401) {
-        setError('Tài khoản hoặc mật khẩu không chính xác!');
+        setError(err.response?.data?.message || 'Tài khoản hoặc mật khẩu không chính xác!');
       } else {
         setError('Không thể kết nối tới máy chủ!');
       }
@@ -126,7 +128,7 @@ const Login = () => {
           <button
             type="button"
             disabled={loading}
-            onClick={() => handleLogin('/dashboard')} // Khi có trang POS sẽ đổi thành '/pos'
+            onClick={() => handleLogin('/pos')}
             style={styles.btnPos}
           >
             <ShoppingCart size={18} />

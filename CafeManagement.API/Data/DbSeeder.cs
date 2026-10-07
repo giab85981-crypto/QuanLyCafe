@@ -1,4 +1,4 @@
-﻿using CafeManagement.API.Entities;
+using CafeManagement.API.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace CafeManagement.API.Data
@@ -7,7 +7,16 @@ namespace CafeManagement.API.Data
     {
         public static async Task SeedAsync(AppDbContext context)
         {
-            await context.Database.EnsureCreatedAsync();
+            await context.Database.MigrateAsync();
+
+            if (!await context.ItemTypes.AnyAsync())
+            {
+                var typeNames = await context.Foods.Where(f => f.ItemType != "")
+                    .Select(f => f.ItemType).Distinct().ToListAsync();
+                typeNames.AddRange(new[] { "Món chế biến", "Hàng hóa", "Dịch vụ" });
+                context.ItemTypes.AddRange(typeNames.Distinct().Select(name => new ItemType { Name = name }));
+                await context.SaveChangesAsync();
+            }
 
             if (!await context.Permissions.AnyAsync())
             {
@@ -63,6 +72,12 @@ namespace CafeManagement.API.Data
                 await context.Accounts.AddAsync(adminAccount);
                 await context.SaveChangesAsync();
             }
+
+            await CafeManagement.API.Services.DynamicAccess.Seed(context);
+
+            var unlinked = await context.Accounts.Where(a => !context.Employees.Any(e => e.UserName == a.UserName)).ToListAsync();
+            foreach (var account in unlinked) context.Employees.Add(new Employee { Name = account.DisplayName, UserName = account.UserName, IsActive = account.IsActive });
+            if (unlinked.Count > 0) await context.SaveChangesAsync();
 
             if (!await context.FoodCategories.AnyAsync())
             {

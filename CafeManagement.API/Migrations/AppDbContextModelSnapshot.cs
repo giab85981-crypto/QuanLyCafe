@@ -22,6 +22,36 @@ namespace CafeManagement.API.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("CafeManagement.API.Entities.AccessAudit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Changes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Target")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AccessAudit");
+                });
+
             modelBuilder.Entity("CafeManagement.API.Entities.Account", b =>
                 {
                     b.Property<string>("UserName")
@@ -44,11 +74,32 @@ namespace CafeManagement.API.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<int>("SecurityVersion")
+                        .HasColumnType("int");
+
                     b.HasKey("UserName");
 
                     b.HasIndex("IdRole");
 
                     b.ToTable("Account");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.AccountPermission", b =>
+                {
+                    b.Property<string>("UserName")
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("IdPermission")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Allowed")
+                        .HasColumnType("bit");
+
+                    b.HasKey("UserName", "IdPermission");
+
+                    b.HasIndex("IdPermission");
+
+                    b.ToTable("AccountPermission");
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.Area", b =>
@@ -80,6 +131,39 @@ namespace CafeManagement.API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("CancellationReason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CancelledBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CreationKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("CustomerNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("CustomerPhoneSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<DateTime>("DateCheckIn")
                         .HasColumnType("datetime2");
 
@@ -89,21 +173,78 @@ namespace CafeManagement.API.Migrations
                     b.Property<int>("Discount")
                         .HasColumnType("int");
 
+                    b.Property<int?>("GuestCount")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("HasRecordedPayment")
+                        .HasColumnType("bit");
+
                     b.Property<int?>("IdCustomer")
                         .HasColumnType("int");
 
-                    b.Property<int>("IdTable")
+                    b.Property<int?>("IdShift")
                         .HasColumnType("int");
+
+                    b.Property<int?>("IdTable")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("OrderType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("PaidBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("PointDiscount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("PointsEarned")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PointsRedeemed")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("RefundAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("RefundMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
+
+                    b.Property<string>("TableNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<decimal>("TotalPrice")
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreationKey")
+                        .IsUnique()
+                        .HasFilter("[CreationKey] <> ''");
+
                     b.HasIndex("IdCustomer");
+
+                    b.HasIndex("IdShift");
 
                     b.HasIndex("IdTable");
 
@@ -125,11 +266,37 @@ namespace CafeManagement.API.Migrations
                     b.Property<int>("Count")
                         .HasColumnType("int");
 
+                    b.Property<string>("FoodNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
                     b.Property<int>("IdBill")
                         .HasColumnType("int");
 
                     b.Property<int>("IdFood")
                         .HasColumnType("int");
+
+                    b.Property<int?>("IdVariant")
+                        .HasColumnType("int");
+
+                    b.Property<string>("IngredientsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OptionLabel")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OptionsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SentCount")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("UnitPrice")
+                        .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
 
@@ -137,7 +304,146 @@ namespace CafeManagement.API.Migrations
 
                     b.HasIndex("IdFood");
 
+                    b.HasIndex("IdVariant");
+
                     b.ToTable("BillInfo");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.CashEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("IdBill")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IdImportReceipt")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IdShift")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("RequestKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdImportReceipt");
+
+                    b.HasIndex("IdShift");
+
+                    b.HasIndex("RequestKey")
+                        .IsUnique()
+                        .HasFilter("[RequestKey] <> ''");
+
+                    b.HasIndex("IdBill", "Direction")
+                        .IsUnique()
+                        .HasFilter("[IdBill] IS NOT NULL");
+
+                    b.ToTable("CashEntry");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.CashierShift", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ClosedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ClosingNote")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ClosingSummaryJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("CountedCash")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("Difference")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("ExpectedCash")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("OpenedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("OpeningCash")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("OpeningNote")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("RequestKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestKey")
+                        .IsUnique();
+
+                    b.HasIndex("UserName")
+                        .IsUnique()
+                        .HasFilter("[ClosedAt] IS NULL");
+
+                    b.ToTable("CashierShift");
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.Customer", b =>
@@ -148,10 +454,47 @@ namespace CafeManagement.API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime?>("Birthday")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Gender")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("IdGroup")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("Phone")
                         .IsRequired()
@@ -163,7 +506,182 @@ namespace CafeManagement.API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasFilter("[Code] <> ''");
+
+                    b.HasIndex("IdGroup");
+
+                    b.HasIndex("Phone")
+                        .IsUnique()
+                        .HasFilter("[Phone] <> ''");
+
                     b.ToTable("Customer");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.CustomerGroup", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("CustomerGroup");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.CustomerPointEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Balance")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Delta")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdBill")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdCustomer")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdCustomer");
+
+                    b.HasIndex("IdBill", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("CustomerPointEntry");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.Employee", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTime?>("Birthday")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Department")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Gender")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<DateTime?>("HireDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Position")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("UserName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserName")
+                        .IsUnique()
+                        .HasFilter("[UserName] IS NOT NULL");
+
+                    b.ToTable("Employee");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.EmployeeActivity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.ToTable("EmployeeActivity");
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.Food", b =>
@@ -174,17 +692,44 @@ namespace CafeManagement.API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<double>("CostPrice")
                         .HasColumnType("float")
                         .HasColumnName("costPrice");
 
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<int>("IdCategory")
                         .HasColumnType("int");
+
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsFavorite")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsTopping")
+                        .HasColumnType("bit");
 
                     b.Property<string>("ItemType")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("MenuKind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -195,6 +740,10 @@ namespace CafeManagement.API.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasFilter("[Code] <> ''");
 
                     b.HasIndex("IdCategory");
 
@@ -219,6 +768,53 @@ namespace CafeManagement.API.Migrations
                     b.ToTable("FoodCategory");
                 });
 
+            modelBuilder.Entity("CafeManagement.API.Entities.FoodTopping", b =>
+                {
+                    b.Property<int>("IdFood")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdTopping")
+                        .HasColumnType("int");
+
+                    b.HasKey("IdFood", "IdTopping");
+
+                    b.HasIndex("IdTopping");
+
+                    b.ToTable("FoodTopping");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.FoodVariant", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<double>("CostPrice")
+                        .HasColumnType("float");
+
+                    b.Property<int>("IdFood")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdFood");
+
+                    b.ToTable("FoodVariant");
+                });
+
             modelBuilder.Entity("CafeManagement.API.Entities.ImportDetail", b =>
                 {
                     b.Property<int>("Id")
@@ -226,6 +822,9 @@ namespace CafeManagement.API.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("ConversionFactor")
+                        .HasColumnType("decimal(18,6)");
 
                     b.Property<double>("Count")
                         .HasColumnType("float");
@@ -236,11 +835,27 @@ namespace CafeManagement.API.Migrations
                     b.Property<int>("IdIngredient")
                         .HasColumnType("int");
 
+                    b.Property<int?>("IdLot")
+                        .HasColumnType("int");
+
+                    b.Property<double?>("InputQuantity")
+                        .HasColumnType("float");
+
+                    b.Property<decimal?>("InputUnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("UnitName")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("IdImportReceipt");
 
                     b.HasIndex("IdIngredient");
+
+                    b.HasIndex("IdLot");
 
                     b.ToTable("ImportDetail");
                 });
@@ -253,11 +868,24 @@ namespace CafeManagement.API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("HasPaymentTracking")
+                        .HasColumnType("bit");
+
                     b.Property<int>("IdSupplier")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("ImportDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("RequestKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<decimal>("TotalAmount")
                         .HasColumnType("decimal(18,2)");
@@ -269,6 +897,10 @@ namespace CafeManagement.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("IdSupplier");
+
+                    b.HasIndex("RequestKey")
+                        .IsUnique()
+                        .HasFilter("[RequestKey] <> ''");
 
                     b.HasIndex("UserName");
 
@@ -282,6 +914,17 @@ namespace CafeManagement.API.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("IdGroup")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
 
                     b.Property<double>("MinQuantity")
                         .HasColumnType("float");
@@ -299,9 +942,87 @@ namespace CafeManagement.API.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(18,4)");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasFilter("[Code] <> ''");
+
+                    b.HasIndex("IdGroup");
+
                     b.ToTable("Ingredient");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.IngredientGroup", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("IngredientGroup");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.IngredientUnit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Factor")
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<int>("IdIngredient")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdIngredient", "Name")
+                        .IsUnique();
+
+                    b.ToTable("IngredientUnit");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.ItemType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("ItemType");
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.KitchenOrder", b =>
@@ -337,7 +1058,18 @@ namespace CafeManagement.API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("CancellationNote")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<int>("CancelledCount")
+                        .HasColumnType("int");
+
                     b.Property<int>("Count")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IdBillInfo")
                         .HasColumnType("int");
 
                     b.Property<int>("IdFood")
@@ -346,11 +1078,17 @@ namespace CafeManagement.API.Migrations
                     b.Property<int>("IdKitchenOrder")
                         .HasColumnType("int");
 
+                    b.Property<string>("OptionLabel")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IdBillInfo");
 
                     b.HasIndex("IdFood");
 
@@ -399,11 +1137,16 @@ namespace CafeManagement.API.Migrations
                     b.Property<int>("IdIngredient")
                         .HasColumnType("int");
 
+                    b.Property<int?>("IdVariant")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("IdFood");
 
                     b.HasIndex("IdIngredient");
+
+                    b.HasIndex("IdVariant");
 
                     b.ToTable("Recipe");
                 });
@@ -415,6 +1158,9 @@ namespace CafeManagement.API.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AccessConfigured")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Description")
                         .HasMaxLength(255)
@@ -445,6 +1191,108 @@ namespace CafeManagement.API.Migrations
                     b.ToTable("RolePermission");
                 });
 
+            modelBuilder.Entity("CafeManagement.API.Entities.StockLot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("IdImportReceipt")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdIngredient")
+                        .HasColumnType("int");
+
+                    b.Property<double>("Quantity")
+                        .HasColumnType("float");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdImportReceipt");
+
+                    b.HasIndex("IdIngredient");
+
+                    b.ToTable("StockLot");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.StockMovement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("IdDocument")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IdImportReceipt")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdIngredient")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IdKitchenDetail")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("IdLot")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<double>("Quantity")
+                        .HasColumnType("float");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdDocument");
+
+                    b.HasIndex("IdImportReceipt");
+
+                    b.HasIndex("IdIngredient");
+
+                    b.HasIndex("IdKitchenDetail");
+
+                    b.HasIndex("IdLot");
+
+                    b.ToTable("StockMovement");
+                });
+
             modelBuilder.Entity("CafeManagement.API.Entities.Supplier", b =>
                 {
                     b.Property<int>("Id")
@@ -455,6 +1303,9 @@ namespace CafeManagement.API.Migrations
 
                     b.Property<string>("Address")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -512,6 +1363,143 @@ namespace CafeManagement.API.Migrations
                     b.ToTable("TableFood");
                 });
 
+            modelBuilder.Entity("CafeManagement.API.Entities.TableOperation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ItemsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("RequestKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("SourceBillId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SourceName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SourceTableId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TargetBillId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TargetName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("TargetTableId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestKey")
+                        .IsUnique();
+
+                    b.ToTable("TableOperation");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.WarehouseDocument", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("RequestKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestKey")
+                        .IsUnique()
+                        .HasFilter("[RequestKey] <> ''");
+
+                    b.ToTable("WarehouseDocument");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.WarehouseDocumentLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<double>("AfterQuantity")
+                        .HasColumnType("float");
+
+                    b.Property<double>("BeforeQuantity")
+                        .HasColumnType("float");
+
+                    b.Property<int>("IdDocument")
+                        .HasColumnType("int");
+
+                    b.Property<int>("IdIngredient")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasColumnType("decimal(18,4)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdDocument");
+
+                    b.HasIndex("IdIngredient");
+
+                    b.ToTable("WarehouseDocumentLine");
+                });
+
             modelBuilder.Entity("CafeManagement.API.Entities.Account", b =>
                 {
                     b.HasOne("CafeManagement.API.Entities.Role", "Role")
@@ -523,19 +1511,44 @@ namespace CafeManagement.API.Migrations
                     b.Navigation("Role");
                 });
 
+            modelBuilder.Entity("CafeManagement.API.Entities.AccountPermission", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.Permission", "Permission")
+                        .WithMany()
+                        .HasForeignKey("IdPermission")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CafeManagement.API.Entities.Account", "Account")
+                        .WithMany()
+                        .HasForeignKey("UserName")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Account");
+
+                    b.Navigation("Permission");
+                });
+
             modelBuilder.Entity("CafeManagement.API.Entities.Bill", b =>
                 {
                     b.HasOne("CafeManagement.API.Entities.Customer", "Customer")
                         .WithMany("Bills")
                         .HasForeignKey("IdCustomer");
 
+                    b.HasOne("CafeManagement.API.Entities.CashierShift", "Shift")
+                        .WithMany()
+                        .HasForeignKey("IdShift")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("CafeManagement.API.Entities.TableFood", "TableFood")
                         .WithMany("Bills")
                         .HasForeignKey("IdTable")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Customer");
+
+                    b.Navigation("Shift");
 
                     b.Navigation("TableFood");
                 });
@@ -554,9 +1567,99 @@ namespace CafeManagement.API.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("CafeManagement.API.Entities.FoodVariant", "Variant")
+                        .WithMany()
+                        .HasForeignKey("IdVariant")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Bill");
 
                     b.Navigation("Food");
+
+                    b.Navigation("Variant");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.CashEntry", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.Bill", "Bill")
+                        .WithMany()
+                        .HasForeignKey("IdBill")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CafeManagement.API.Entities.ImportReceipt", "ImportReceipt")
+                        .WithMany()
+                        .HasForeignKey("IdImportReceipt")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CafeManagement.API.Entities.CashierShift", "Shift")
+                        .WithMany()
+                        .HasForeignKey("IdShift")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Bill");
+
+                    b.Navigation("ImportReceipt");
+
+                    b.Navigation("Shift");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.CashierShift", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.Account", "Account")
+                        .WithMany()
+                        .HasForeignKey("UserName")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Account");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.Customer", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.CustomerGroup", "Group")
+                        .WithMany()
+                        .HasForeignKey("IdGroup")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Group");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.CustomerPointEntry", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.Bill", "Bill")
+                        .WithMany()
+                        .HasForeignKey("IdBill")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CafeManagement.API.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("IdCustomer")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Bill");
+
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.Employee", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.Account", "Account")
+                        .WithMany()
+                        .HasForeignKey("UserName")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Account");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.EmployeeActivity", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.Food", b =>
@@ -568,6 +1671,36 @@ namespace CafeManagement.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.FoodTopping", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.Food", "Food")
+                        .WithMany("AllowedToppings")
+                        .HasForeignKey("IdFood")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CafeManagement.API.Entities.Food", "Topping")
+                        .WithMany()
+                        .HasForeignKey("IdTopping")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Food");
+
+                    b.Navigation("Topping");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.FoodVariant", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.Food", "Food")
+                        .WithMany("Variants")
+                        .HasForeignKey("IdFood")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Food");
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.ImportDetail", b =>
@@ -584,9 +1717,16 @@ namespace CafeManagement.API.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("CafeManagement.API.Entities.StockLot", "Lot")
+                        .WithMany()
+                        .HasForeignKey("IdLot")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("ImportReceipt");
 
                     b.Navigation("Ingredient");
+
+                    b.Navigation("Lot");
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.ImportReceipt", b =>
@@ -608,6 +1748,27 @@ namespace CafeManagement.API.Migrations
                     b.Navigation("Supplier");
                 });
 
+            modelBuilder.Entity("CafeManagement.API.Entities.Ingredient", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.IngredientGroup", "Group")
+                        .WithMany()
+                        .HasForeignKey("IdGroup")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Group");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.IngredientUnit", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.Ingredient", "Ingredient")
+                        .WithMany("Units")
+                        .HasForeignKey("IdIngredient")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ingredient");
+                });
+
             modelBuilder.Entity("CafeManagement.API.Entities.KitchenOrder", b =>
                 {
                     b.HasOne("CafeManagement.API.Entities.Bill", "Bill")
@@ -621,6 +1782,11 @@ namespace CafeManagement.API.Migrations
 
             modelBuilder.Entity("CafeManagement.API.Entities.KitchenOrderDetail", b =>
                 {
+                    b.HasOne("CafeManagement.API.Entities.BillInfo", "BillInfo")
+                        .WithMany()
+                        .HasForeignKey("IdBillInfo")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("CafeManagement.API.Entities.Food", "Food")
                         .WithMany("KitchenOrderDetails")
                         .HasForeignKey("IdFood")
@@ -632,6 +1798,8 @@ namespace CafeManagement.API.Migrations
                         .HasForeignKey("IdKitchenOrder")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("BillInfo");
 
                     b.Navigation("Food");
 
@@ -652,9 +1820,16 @@ namespace CafeManagement.API.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("CafeManagement.API.Entities.FoodVariant", "Variant")
+                        .WithMany("Recipes")
+                        .HasForeignKey("IdVariant")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Food");
 
                     b.Navigation("Ingredient");
+
+                    b.Navigation("Variant");
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.RolePermission", b =>
@@ -676,6 +1851,63 @@ namespace CafeManagement.API.Migrations
                     b.Navigation("Role");
                 });
 
+            modelBuilder.Entity("CafeManagement.API.Entities.StockLot", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.ImportReceipt", "ImportReceipt")
+                        .WithMany()
+                        .HasForeignKey("IdImportReceipt")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CafeManagement.API.Entities.Ingredient", "Ingredient")
+                        .WithMany("Lots")
+                        .HasForeignKey("IdIngredient")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ImportReceipt");
+
+                    b.Navigation("Ingredient");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.StockMovement", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.WarehouseDocument", "Document")
+                        .WithMany()
+                        .HasForeignKey("IdDocument")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CafeManagement.API.Entities.ImportReceipt", "ImportReceipt")
+                        .WithMany()
+                        .HasForeignKey("IdImportReceipt")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CafeManagement.API.Entities.Ingredient", "Ingredient")
+                        .WithMany()
+                        .HasForeignKey("IdIngredient")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CafeManagement.API.Entities.KitchenOrderDetail", "KitchenDetail")
+                        .WithMany()
+                        .HasForeignKey("IdKitchenDetail")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("CafeManagement.API.Entities.StockLot", "Lot")
+                        .WithMany()
+                        .HasForeignKey("IdLot")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Document");
+
+                    b.Navigation("ImportReceipt");
+
+                    b.Navigation("Ingredient");
+
+                    b.Navigation("KitchenDetail");
+
+                    b.Navigation("Lot");
+                });
+
             modelBuilder.Entity("CafeManagement.API.Entities.TableFood", b =>
                 {
                     b.HasOne("CafeManagement.API.Entities.Area", "Area")
@@ -683,6 +1915,25 @@ namespace CafeManagement.API.Migrations
                         .HasForeignKey("IdArea");
 
                     b.Navigation("Area");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.WarehouseDocumentLine", b =>
+                {
+                    b.HasOne("CafeManagement.API.Entities.WarehouseDocument", "Document")
+                        .WithMany("Lines")
+                        .HasForeignKey("IdDocument")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("CafeManagement.API.Entities.Ingredient", "Ingredient")
+                        .WithMany()
+                        .HasForeignKey("IdIngredient")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Document");
+
+                    b.Navigation("Ingredient");
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.Area", b =>
@@ -704,16 +1955,25 @@ namespace CafeManagement.API.Migrations
 
             modelBuilder.Entity("CafeManagement.API.Entities.Food", b =>
                 {
+                    b.Navigation("AllowedToppings");
+
                     b.Navigation("BillInfos");
 
                     b.Navigation("KitchenOrderDetails");
 
                     b.Navigation("Recipes");
+
+                    b.Navigation("Variants");
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.FoodCategory", b =>
                 {
                     b.Navigation("Foods");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.FoodVariant", b =>
+                {
+                    b.Navigation("Recipes");
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.ImportReceipt", b =>
@@ -725,7 +1985,11 @@ namespace CafeManagement.API.Migrations
                 {
                     b.Navigation("ImportDetails");
 
+                    b.Navigation("Lots");
+
                     b.Navigation("Recipes");
+
+                    b.Navigation("Units");
                 });
 
             modelBuilder.Entity("CafeManagement.API.Entities.KitchenOrder", b =>
@@ -753,6 +2017,11 @@ namespace CafeManagement.API.Migrations
             modelBuilder.Entity("CafeManagement.API.Entities.TableFood", b =>
                 {
                     b.Navigation("Bills");
+                });
+
+            modelBuilder.Entity("CafeManagement.API.Entities.WarehouseDocument", b =>
+                {
+                    b.Navigation("Lines");
                 });
 #pragma warning restore 612, 618
         }

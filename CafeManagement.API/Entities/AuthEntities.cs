@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace CafeManagement.API.Entities
@@ -20,10 +20,12 @@ namespace CafeManagement.API.Entities
         public Role? Role { get; set; }
 
         public bool IsActive { get; set; } = true;
+        public int SecurityVersion { get; set; }
     }
 
     public class Role
     {
+        public bool AccessConfigured { get; set; }
         [Key]
         public int Id { get; set; }
 
@@ -58,5 +60,23 @@ namespace CafeManagement.API.Entities
 
         public int IdPermission { get; set; }
         public Permission Permission { get; set; } = null!;
+    }
+
+    public class AccountPermission
+    {
+        public string UserName { get; set; } = "";
+        public Account Account { get; set; } = null!;
+        public int IdPermission { get; set; }
+        public Permission Permission { get; set; } = null!;
+        public bool Allowed { get; set; }
+    }
+
+    public class AccessAudit
+    {
+        public int Id { get; set; }
+        [MaxLength(100)] public string Actor { get; set; } = "";
+        [MaxLength(100)] public string Target { get; set; } = "";
+        public string Changes { get; set; } = "";
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }

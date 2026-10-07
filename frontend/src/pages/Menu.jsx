@@ -1,491 +1,81 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { can, useAccess } from '../utils/staffAccess'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Plus, Search, Star, Pencil, Trash2, Coffee, Download, Upload, Layers, Package, LayoutGrid, List, X, ImagePlus } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import {
-  Search,
-  ChevronDown,
-  Upload,
-  Download,
-  List,
-  HelpCircle,
-  Settings,
-  Star,
-  X,
-  Plus,
-  Pencil,
-} from 'lucide-react'
-import axiosClient from '../api/axiosClient'
+import api from '../api/axiosClient'
+import Modal from '../components/Modal'
 import './Menu.css'
-
-const money = (n) => Number(n || 0).toLocaleString('vi-VN')
-
-// Khớp CreateFoodDto/UpdateFoodDto bên backend: { Name, Price, CostPrice, IdCategory, ItemType }
-const initialForm = { name: '', idCategory: '', price: '', costPrice: '', itemType: '' }
-
-// Danh sách "Loại món" cố định — có thể chỉnh lại cho đúng nhu cầu quán
-const ITEM_TYPES = ['Món chế biến', 'Hàng hóa', 'Dịch vụ']
-
-function Menu() {
-  const [foods, setFoods] = useState([])
-  const [categories, setCategories] = useState([])
-  const [activeCat, setActiveCat] = useState(null)
-  const [keyword, setKeyword] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  // UI-only: chọn dòng / đánh dấu món hay bán (chưa có field tương ứng ở backend)
-  const [selectedIds, setSelectedIds] = useState(new Set())
-  const [favoriteIds, setFavoriteIds] = useState(new Set())
-
-  // Modal "Món mới" / "Sửa món" — dùng chung, phân biệt bằng editingId
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [form, setForm] = useState(initialForm)
-  const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState('')
-
-  // "+ Tạo mới" nhóm món (category) ở sidebar
-  const [showNewCat, setShowNewCat] = useState(false)
-  const [newCatName, setNewCatName] = useState('')
-  const [savingCat, setSavingCat] = useState(false)
-  const [catError, setCatError] = useState('')
-
-  // Import CSV
-  const fileInputRef = useRef(null)
-  const [importing, setImporting] = useState(false)
-
-  const loadFoods = () => {
-    setLoading(true)
-    Promise.all([axiosClient.get('/Food'), axiosClient.get('/FoodCategory')])
-      .then(([f, c]) => {
-        setFoods(f.data)
-        setCategories(c.data)
-      })
-      .catch(() => setError('Không tải được thực đơn. Kiểm tra backend đã chạy chưa.'))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    loadFoods()
-  }, [])
-
-  const rows = useMemo(() => {
-    const kw = keyword.trim().toLowerCase()
-    return foods.filter(
-      (f) =>
-        (activeCat === null || f.idCategory === activeCat) &&
-        (!kw || f.name.toLowerCase().includes(kw)),
-    )
-  }, [foods, activeCat, keyword])
-
-  const allSelected = rows.length > 0 && rows.every((f) => selectedIds.has(f.id))
-
-  const toggleSelectAll = () => {
-    setSelectedIds(allSelected ? new Set() : new Set(rows.map((f) => f.id)))
-  }
-
-  const toggleSelectOne = (id) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  const toggleFavorite = (id) => {
-    setFavoriteIds((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  // ---- "+ Tạo mới" nhóm món: POST /api/FoodCategory ----
-  const openNewCat = () => {
-    setNewCatName('')
-    setCatError('')
-    setShowNewCat(true)
-  }
-
-  const cancelNewCat = () => {
-    if (savingCat) return
-    setShowNewCat(false)
-  }
-
-  const handleCreateCategory = async (e) => {
-    e.preventDefault()
-    if (!newCatName.trim()) {
-      setCatError('Vui lòng nhập tên nhóm món.')
-      return
-    }
-
-    setSavingCat(true)
-    setCatError('')
-    try {
-      const res = await axiosClient.post('/FoodCategory', { name: newCatName.trim() })
-      const created = res.data
-      setCategories((prev) => [...prev, created])
-      setActiveCat(created.id)
-      setShowNewCat(false)
-    } catch (err) {
-      setCatError('Tạo nhóm món thất bại. Kiểm tra lại kết nối backend.')
-    } finally {
-      setSavingCat(false)
-    }
-  }
-
-  // ---- "Món mới": mở modal ở chế độ thêm ----
-  const openAddModal = () => {
-    setEditingId(null)
-    setForm({ ...initialForm, idCategory: categories[0]?.id ?? '', itemType: ITEM_TYPES[0] })
-    setFormError('')
-    setShowAddModal(true)
-  }
-
-  // ---- "Sửa": mở modal ở chế độ sửa, điền sẵn dữ liệu của món đang chọn ----
-  const openEditModal = (food) => {
-    setEditingId(food.id)
-    setForm({
-      name: food.name,
-      idCategory: food.idCategory,
-      price: food.price,
-      costPrice: food.costPrice,
-      itemType: food.itemType || ITEM_TYPES[0],
-    })
-    setFormError('')
-    setShowAddModal(true)
-  }
-
-  const closeAddModal = () => {
-    if (saving) return
-    setShowAddModal(false)
-  }
-
-  const handleFormChange = (e) => {
-    const { name, value } = e.target
-    setForm((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleAddSubmit = async (e) => {
-    e.preventDefault()
-    if (!form.name.trim() || !form.price || !form.idCategory) {
-      setFormError('Vui lòng nhập tên món, giá bán và chọn nhóm món.')
-      return
-    }
-
-    const payload = {
-      name: form.name.trim(),
-      idCategory: Number(form.idCategory),
-      price: Number(form.price) || 0,
-      costPrice: Number(form.costPrice) || 0,
-      itemType: form.itemType || '',
-    }
-
-    setSaving(true)
-    setFormError('')
-    try {
-      if (editingId) {
-        await axiosClient.put(`/Food/${editingId}`, payload)
-      } else {
-        await axiosClient.post('/Food', payload)
-      }
-      setShowAddModal(false)
-      loadFoods()
-    } catch (err) {
-      setFormError(
-        editingId
-          ? 'Cập nhật món thất bại. Kiểm tra lại dữ liệu hoặc kết nối backend.'
-          : 'Thêm món thất bại. Kiểm tra lại dữ liệu hoặc kết nối backend.',
-      )
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // ---- "Xuất file": xuất Excel (.xlsx) bằng thư viện xlsx (SheetJS) ----
-  // Cần cài: npm install xlsx
-  const handleExport = () => {
-    const data = rows.map((f) => ({
-      'Mã món': `MN${String(f.id).padStart(4, '0')}`,
-      'Tên món': f.name,
-      'Nhóm món': f.categoryName,
-      'Loại món': f.itemType || '',
-      'Giá bán': f.price,
-      'Giá vốn': f.costPrice,
-    }))
-
-    const worksheet = XLSX.utils.json_to_sheet(data)
-    worksheet['!cols'] = [{ wch: 10 }, { wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 12 }]
-
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Thực đơn')
-
-    XLSX.writeFile(workbook, `thuc-don-${new Date().toISOString().slice(0, 10)}.xlsx`)
-  }
-
-  // ---- "Import": đọc CSV (Tên món,Nhóm món,Giá bán,Giá vốn) và POST từng dòng ----
-  const handleImportClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleImportFile = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setImporting(true)
-    setError('')
-    try {
-      const text = await file.text()
-      const lines = text.split(/\r?\n/).filter((l) => l.trim())
-      const dataLines = /^[^,]+,[^,]+,\s*\d/.test(lines[0]) ? lines : lines.slice(1)
-
-      const items = dataLines
-        .map((line) => {
-          const [name, categoryName, price, costPrice] = line.split(',').map((s) => s.trim())
-          const match = categories.find((c) => c.name === categoryName)
-          return {
-            name,
-            idCategory: match ? match.id : null,
-            price: Number(price) || 0,
-            costPrice: Number(costPrice) || 0,
-            itemType: '', // CSV import chưa có cột Loại món, để trống
-          }
-        })
-        .filter((item) => item.name && item.idCategory)
-
-      if (items.length === 0) {
-        setError(
-          'File import không có dòng hợp lệ. Định dạng cần: Tên món,Nhóm món,Giá bán,Giá vốn — và "Nhóm món" phải trùng tên nhóm đã có sẵn.',
-        )
-        return
-      }
-
-      await Promise.all(items.map((item) => axiosClient.post('/Food', item)))
-      loadFoods()
-    } catch (err) {
-      setError('Import thất bại. Kiểm tra định dạng file hoặc kết nối backend.')
-    } finally {
-      setImporting(false)
-      e.target.value = ''
-    }
-  }
-
-  return (
-    <div className="menu-page">
-      <aside className="menu-side">
-        <div className="menu-side-head">
-          <h3>Nhóm hàng</h3>
-          <button className="link-btn" type="button" onClick={openNewCat}>
-            <Plus size={14} /> Tạo mới
-          </button>
-        </div>
-
-        {showNewCat && (
-          <form className="new-cat-form" onSubmit={handleCreateCategory}>
-            {catError && <div className="menu-error menu-error-sm">{catError}</div>}
-            <input
-              autoFocus
-              placeholder="Tên nhóm món mới"
-              value={newCatName}
-              onChange={(e) => setNewCatName(e.target.value)}
-            />
-            <div className="new-cat-actions">
-              <button type="button" className="btn-outline btn-sm" onClick={cancelNewCat} disabled={savingCat}>
-                Hủy
-              </button>
-              <button type="submit" className="btn-new btn-sm" disabled={savingCat}>
-                {savingCat ? 'Đang lưu...' : 'Lưu'}
-              </button>
-            </div>
-          </form>
-        )}
-
-        <ul>
-          <li>
-            <button className={activeCat === null ? 'is-active' : ''} onClick={() => setActiveCat(null)}>
-              Tất cả
-            </button>
-          </li>
-          {categories.map((c) => (
-            <li key={c.id}>
-              <button className={activeCat === c.id ? 'is-active' : ''} onClick={() => setActiveCat(c.id)}>
-                {c.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </aside>
-
-      <section className="menu-main">
-        <div className="menu-head">
-          <h1>Thực đơn</h1>
-        </div>
-
-        <div className="menu-toolbar">
-          <div className="menu-search-wrap">
-            <Search size={16} className="menu-search-icon" />
-            <input
-              className="menu-search"
-              placeholder="Theo mã hoặc tên món"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-            />
-          </div>
-
-          <div className="menu-toolbar-actions">
-            <button className="btn-new" type="button" onClick={openAddModal}>
-              Món mới <ChevronDown size={14} />
-            </button>
-            <button className="btn-outline" type="button" onClick={handleImportClick} disabled={importing}>
-              <Upload size={16} /> {importing ? 'Đang import...' : 'Import'}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              style={{ display: 'none' }}
-              onChange={handleImportFile}
-            />
-            <button className="btn-outline" type="button" onClick={handleExport}>
-              <Download size={16} /> Xuất file
-            </button>
-            <button className="icon-btn" type="button" title="Danh sách">
-              <List size={18} />
-            </button>
-            <button className="icon-btn" type="button" title="Trợ giúp">
-              <HelpCircle size={18} />
-            </button>
-            <button className="icon-btn" type="button" title="Cài đặt">
-              <Settings size={18} />
-            </button>
-          </div>
-        </div>
-
-        {error && <div className="menu-error">{error}</div>}
-
-        <table className="menu-table">
-          <thead>
-            <tr>
-              <th className="col-check">
-                <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} />
-              </th>
-              <th className="col-star"></th>
-              <th>Mã món</th>
-              <th>Tên món</th>
-              <th>Nhóm món</th>
-              <th>Loại món</th>
-              <th className="num">Giá bán</th>
-              <th className="col-actions"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan="8" className="menu-empty">Đang tải...</td></tr>
-            )}
-            {!loading && rows.length === 0 && !error && (
-              <tr><td colSpan="8" className="menu-empty">Không có món nào phù hợp</td></tr>
-            )}
-            {rows.map((f) => (
-              <tr key={f.id} className={selectedIds.has(f.id) ? 'is-selected' : ''}>
-                <td className="col-check">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(f.id)}
-                    onChange={() => toggleSelectOne(f.id)}
-                  />
-                </td>
-                <td className="col-star">
-                  <button
-                    type="button"
-                    className={`star-btn ${favoriteIds.has(f.id) ? 'is-fav' : ''}`}
-                    onClick={() => toggleFavorite(f.id)}
-                    title="Đánh dấu món hay bán"
-                  >
-                    <Star size={16} />
-                  </button>
-                </td>
-                <td>MN{String(f.id).padStart(4, '0')}</td>
-                <td>{f.name}</td>
-                <td>{f.categoryName}</td>
-                <td>{f.itemType || '-'}</td>
-                <td className="num">{money(f.price)}</td>
-                <td className="col-actions">
-                  <button
-                    type="button"
-                    className="edit-btn"
-                    onClick={() => openEditModal(f)}
-                    title="Sửa món"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      {showAddModal && (
-        <div className="modal-overlay" onClick={closeAddModal}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{editingId ? 'Sửa món' : 'Thêm món mới'}</h2>
-              <button className="icon-btn" type="button" onClick={closeAddModal}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddSubmit}>
-              {formError && <div className="menu-error">{formError}</div>}
-
-              <label className="form-field">
-                <span>Tên món</span>
-                <input name="name" value={form.name} onChange={handleFormChange} placeholder="VD: Cà phê sữa" />
-              </label>
-
-              <div className="form-row">
-                <label className="form-field">
-                  <span>Nhóm món</span>
-                  <select name="idCategory" value={form.idCategory} onChange={handleFormChange}>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="form-field">
-                  <span>Loại món</span>
-                  <select name="itemType" value={form.itemType} onChange={handleFormChange}>
-                    {ITEM_TYPES.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="form-row">
-                <label className="form-field">
-                  <span>Giá bán</span>
-                  <input name="price" type="number" min="0" value={form.price} onChange={handleFormChange} />
-                </label>
-                <label className="form-field">
-                  <span>Giá vốn</span>
-                  <input name="costPrice" type="number" min="0" value={form.costPrice} onChange={handleFormChange} />
-                </label>
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" className="btn-outline" onClick={closeAddModal} disabled={saving}>
-                  Hủy
-                </button>
-                <button type="submit" className="btn-new" disabled={saving}>
-                  {saving ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : 'Lưu'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  )
+const money = n => Number(n || 0).toLocaleString('vi-VN')
+const costLabel = food => {
+  const active = food.variants.filter(v => v.isActive)
+  if (!active.length) return `${money(food.costPrice)} đ`
+  const min = Math.min(...active.map(v => v.costPrice)), max = Math.max(...active.map(v => v.costPrice))
+  return min === max ? `${money(min)} đ` : `${money(min)}–${money(max)} đ`
 }
-
-export default Menu
+const errorText = e => typeof e.response?.data === 'string' ? e.response.data : e.response?.data?.message || 'Không thực hiện được. Kiểm tra kết nối backend.'
+const emptyFood = category => ({ name: '', code: '', description: '', price: 0, costPrice: 0, idCategory: category || 0, itemType: '', menuKind: 'Đồ uống', isActive: true, isFavorite: false, isTopping: false, imageUrl: null, recipe: [], variants: [], toppingIds: [] })
+function RecipeEditor({ value, onChange, ingredients, fallback, onFallback }) {
+  const cost = value.reduce((s, r) => s + Number(r.amount) * Number(ingredients.find(i => i.id === Number(r.idIngredient))?.unitCost || 0), 0)
+  return <div className="recipe-editor"><div className="recipe-editor__head"><b>Công thức cho 1 phần</b><button type="button" onClick={() => onChange([...value, { idIngredient: ingredients[0]?.id || 0, amount: 1 }])} disabled={!ingredients.length}><Plus size={15} /> Nguyên liệu</button></div>
+    {!ingredients.length && <p className="mc-muted">Tạo nguyên liệu trong “Nguyên liệu & kho” trước.</p>}
+    {value.map((r, index) => <div className="recipe-row" key={index}><select aria-label="Nguyên liệu" value={r.idIngredient} onChange={e => onChange(value.map((x, j) => j === index ? { ...x, idIngredient: Number(e.target.value) } : x))}>{ingredients.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}</select><input aria-label="Định lượng" type="number" min="0.0001" step="any" value={r.amount} onChange={e => onChange(value.map((x, j) => j === index ? { ...x, amount: Number(e.target.value) } : x))} /><button type="button" aria-label="Bỏ nguyên liệu" onClick={() => onChange(value.filter((_, j) => j !== index))}><X size={16} /></button></div>)}
+    <div className="recipe-cost">{value.length ? <>Giá vốn theo công thức <b>{money(cost)} đ</b></> : <label>Giá vốn nhập tay (đ)<input type="number" min="0" value={fallback} onChange={e => onFallback(Number(e.target.value))} /></label>}</div>
+  </div>
+}
+export default function Menu() {
+  useAccess()
+  const [foods, setFoods] = useState([]), [categories, setCategories] = useState([]), [types, setTypes] = useState([]), [ingredients, setIngredients] = useState([])
+  const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [msg, setMsg] = useState(''), [loadError, setLoadError] = useState(false)
+  const [keyword, setKeyword] = useState(''), [category, setCategory] = useState(''), [status, setStatus] = useState(''), [kind, setKind] = useState(''), [type, setType] = useState(''), [favorite, setFavorite] = useState(false), [toppingOnly, setToppingOnly] = useState(false), [grid, setGrid] = useState(false), [page, setPage] = useState(1)
+  const [form, setForm] = useState(null), [formTab, setFormTab] = useState('info'), [dialog, setDialog] = useState(null), [groupTab, setGroupTab] = useState('FoodCategory'), [groupName, setGroupName] = useState(''), [groupEdit, setGroupEdit] = useState(null)
+  const [ingredientForm, setIngredientForm] = useState(null), [movements, setMovements] = useState([]), [stockTab, setStockTab] = useState('ingredients'), [importRows, setImportRows] = useState([]), [importResult, setImportResult] = useState(null)
+  const importInput = useRef(null)
+  const load = useCallback(async () => {
+    try { const results = await Promise.all([api.get('/Food'), api.get('/FoodCategory'), api.get('/ItemType'), api.get('/Inventory/ingredients')]); setFoods(results[0].data); setCategories(results[1].data); setTypes(results[2].data); setIngredients(results[3].data); setLoadError(false) }
+    catch(e) { setLoadError(true); setMsg(errorText(e)) } finally { setLoading(false) }
+  }, [])
+  useEffect(() => { load() }, [load])
+  const run = async (fn, message = '') => { setBusy(true); setMsg(''); try { await fn(); await load(); if (message) setMsg(message) } catch(e) { setMsg(errorText(e)) } finally { setBusy(false) } }
+  const filtered = useMemo(() => foods.filter(f => (!category || f.idCategory === Number(category)) && (!status || String(f.isActive) === status) && (!kind || f.menuKind === kind) && (!type || f.itemType === type) && (!favorite || f.isFavorite) && (!toppingOnly || f.isTopping) && `${f.name} ${f.code}`.toLocaleLowerCase('vi').includes(keyword.toLocaleLowerCase('vi'))), [foods, category, status, kind, type, favorite, toppingOnly, keyword])
+  const pageCount = Math.max(1, Math.ceil(filtered.length / 12)), currentPage = Math.min(page, pageCount), shown = filtered.slice((currentPage - 1) * 12, currentPage * 12)
+  const edit = food => { setMsg(''); setForm(food ? structuredClone(food) : emptyFood(Number(category) || categories[0]?.id)); setFormTab('info') }
+  const change = (key, value) => setForm(f => ({ ...f, [key]: value }))
+  const save = () => run(async () => { if (form.id) await api.put(`/Food/${form.id}`, form); else await api.post('/Food', form); setForm(null) }, 'Đã lưu thực đơn.')
+  const remove = food => setDialog({ kind: 'delete', food })
+  const exportFile = (template = false) => {
+    const rows = template ? [{ 'Mã món': 'CF001', 'Tên món': 'Cà phê sữa', 'Nhóm': categories[0]?.name || '', 'Loại món': types[0]?.name || '', 'Phân loại': 'Đồ uống', 'Giá bán': 30000, 'Giá vốn': 10000, 'Topping': 'Không', 'Đang bán': 'Có', 'Mô tả': '' }] : filtered.map(f => ({ 'Mã món': f.code, 'Tên món': f.name, 'Nhóm': f.categoryName, 'Loại món': f.itemType, 'Phân loại': f.menuKind, 'Giá bán': f.price, 'Giá vốn': f.costPrice, 'Topping': f.isTopping ? 'Có' : 'Không', 'Đang bán': f.isActive ? 'Có' : 'Không', 'Mô tả': f.description }))
+    const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(rows), 'Thực đơn'); XLSX.writeFile(workbook, template ? 'Mau-thuc-don.xlsx' : 'Thuc-don.xlsx')
+  }
+  const importFile = async e => {
+    const file = e.target.files?.[0]; e.target.value = ''; if (!file) return
+    if (file.size > 5 * 1024 * 1024) { setMsg('File Excel tối đa 5 MB.'); return }
+    setBusy(true); setMsg('')
+    try { const workbook = XLSX.read(await file.arrayBuffer()); const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: '' });
+      const items = rows.map(row => ({ ...emptyFood(categories.find(c => c.name.trim().toLowerCase() === String(row['Nhóm']).trim().toLowerCase())?.id), name: String(row['Tên món']), code: String(row['Mã món']), itemType: String(row['Loại món']), menuKind: String(row['Phân loại'] || 'Đồ uống'), price: Number(row['Giá bán']), costPrice: Number(row['Giá vốn']), isTopping: String(row['Topping']).toLowerCase() === 'có', isActive: String(row['Đang bán']).toLowerCase() !== 'không', description: String(row['Mô tả']) }))
+      const { data } = await api.post('/Food/import', { items, preview: true }); setImportRows(items); setImportResult(data); setDialog({ kind: 'import' })
+    } catch(e) { setMsg(errorText(e)) } finally { setBusy(false) }
+  }
+  const image = async e => { const file = e.target.files?.[0]; if (!file) return; if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) { setMsg('Chọn ảnh JPG/PNG/WebP tối đa 2 MB.'); return } const reader = new FileReader(); reader.onload = () => change('imageUrl', reader.result); reader.readAsDataURL(file) }
+  const stock = () => run(async () => { const { data } = await api.get('/Inventory/movements'); setMovements(data); setDialog({ kind: 'stock' }); setIngredientForm(null) })
+  return <div className="menu-catalog">
+    <div className="mc-heading"><div><span className="mc-eyebrow">QUẢN LÝ QUÁN</span><h1>Thực đơn</h1><p>Mỗi món ngon, một công thức rõ ràng.</p></div><div className="mc-toolbar"><button hidden={!can('INVENTORY_VIEW')} onClick={stock} disabled={busy}><Package size={17} /> Nguyên liệu & kho</button><button hidden={!can('MENU_GROUPS')} onClick={() => { setDialog({ kind: 'groups' }); setGroupEdit(null); setGroupName('') }}><Layers size={17} /> Nhóm & loại</button><button hidden={!can('MENU_CREATE')} className="mc-primary" disabled={loading || loadError || busy} onClick={() => edit()}><Plus size={18} /> Thêm món</button></div></div>
+    <div className="mc-stats"><div><span>Tổng thực đơn</span><b>{foods.length}<small> món</small></b></div><div><span>Đang phục vụ</span><b>{foods.filter(f => f.isActive).length}<small> món</small></b></div><div><span>Có công thức</span><b>{foods.filter(f => f.hasRecipe).length}<small> món</small></b></div><div><span>Topping</span><b>{foods.filter(f => f.isTopping).length}<small> tùy chọn</small></b></div></div>
+    {msg && <div className="mc-notice" role="status">{msg}<button onClick={() => setMsg('')} aria-label="Đóng thông báo"><X size={16} /></button></div>}
+    <div className="mc-layout"><aside className="mc-sidebar"><h3>Nhóm thực đơn</h3><button className={!category ? 'selected' : ''} onClick={() => { setCategory(''); setPage(1) }}>Tất cả món <span>{foods.length}</span></button>{categories.map(c => <button key={c.id} className={Number(category) === c.id ? 'selected' : ''} onClick={() => { setCategory(String(c.id)); setPage(1) }}>{c.name}<span>{foods.filter(f => f.idCategory === c.id).length}</span></button>)}<hr /><label><input type="checkbox" checked={favorite} onChange={e => setFavorite(e.target.checked)} /> Món yêu thích</label><label><input type="checkbox" checked={toppingOnly} onChange={e => setToppingOnly(e.target.checked)} /> Chỉ topping</label><p className="mc-tip">Công thức giúp tính giá vốn và tự xuất nguyên liệu khi báo bếp.</p></aside>
+    <main className="mc-main"><div className="mc-filters"><div className="mc-search"><Search size={18} /><input placeholder="Tìm tên hoặc mã món..." value={keyword} onChange={e => { setKeyword(e.target.value); setPage(1) }} /></div><select aria-label="Trạng thái" value={status} onChange={e => setStatus(e.target.value)}><option value="">Mọi trạng thái</option><option value="true">Đang bán</option><option value="false">Ngừng bán</option></select><select aria-label="Phân loại" value={kind} onChange={e => setKind(e.target.value)}><option value="">Mọi phân loại</option>{['Đồ uống', 'Đồ ăn', 'Dịch vụ', 'Khác'].map(k => <option key={k}>{k}</option>)}</select><select aria-label="Loại món" value={type} onChange={e => setType(e.target.value)}><option value="">Mọi loại món</option>{types.map(t => <option key={t.id}>{t.name}</option>)}</select></div>
+      <div className="mc-listbar"><span><b>{filtered.length}</b> kết quả</span><div><button onClick={() => exportFile(true)}><Download size={15} /> File mẫu</button><button disabled={!filtered.length} onClick={() => exportFile()}><Download size={15} /> Xuất Excel</button><button hidden={!can('MENU_IMPORT')} disabled={busy || loadError} onClick={() => importInput.current.click()}><Upload size={15} /> Nhập Excel</button><input hidden ref={importInput} type="file" accept=".xlsx,.xls" onChange={importFile} /><button aria-label="Đổi kiểu hiển thị" onClick={() => setGrid(!grid)}>{grid ? <List size={18} /> : <LayoutGrid size={18} />}</button></div></div>
+      {loading ? <div className="mc-empty">Đang tải thực đơn...</div> : loadError ? <div className="mc-empty">Chưa tải được dữ liệu.<button onClick={load}>Thử lại</button></div> : !shown.length ? <div className="mc-empty"><Coffee size={38} /><h3>Chưa có món phù hợp</h3><p>Thay đổi bộ lọc hoặc thêm món đầu tiên.</p></div> : grid ? <div className="mc-grid">{shown.map(f => <article key={f.id}><button className="mc-card-image" onClick={() => edit(f)}>{f.imageUrl ? <img src={f.imageUrl} alt={f.name} /> : <Coffee size={42} />}</button><div className="mc-card-info"><small>{f.categoryName} · {f.code}</small><h3>{f.name}</h3><b>{money(f.variants.filter(v => v.isActive).length ? Math.min(...f.variants.filter(v => v.isActive).map(v => v.price)) : f.price)} đ</b><span className={`mc-badge ${f.isActive ? '' : 'off'}`}>{f.isActive ? 'Đang bán' : 'Ngừng bán'}</span><div className="mc-card-actions"><button hidden={!can('MENU_EDIT')} onClick={() => edit(f)}><Pencil size={15} /> Sửa</button><button hidden={!can('MENU_EDIT')} onClick={() => run(() => api.put(`/Food/${f.id}/favorite`, { isFavorite: !f.isFavorite }))} aria-label="Yêu thích"><Star size={17} fill={f.isFavorite ? '#e9a52a' : 'none'} /></button></div></div></article>)}</div> : <div className="mc-table-wrap"><table className="mc-table"><thead><tr><th>Món / Topping</th><th>Nhóm & loại</th><th>Giá bán</th><th>Giá vốn</th><th>Tồn khả dụng</th><th>Trạng thái</th><th /></tr></thead><tbody>{shown.map(f => <tr key={f.id}><td><div className="mc-product"><button className="mc-thumb" onClick={() => edit(f)}>{f.imageUrl ? <img alt={f.name} src={f.imageUrl} /> : <Coffee size={22} />}</button><div><button className="mc-name" onClick={() => edit(f)}>{f.name}</button><small>{f.code}{f.isTopping ? ' · Topping' : ''}{f.variants.filter(v => v.isActive).length > 0 ? ` · ${f.variants.filter(v => v.isActive).length} size` : ''}</small></div></div></td><td>{f.categoryName}<small>{f.itemType || f.menuKind}</small></td><td><b>{money(f.variants.filter(v => v.isActive).length ? Math.min(...f.variants.filter(v => v.isActive).map(v => v.price)) : f.price)} đ</b>{f.variants.some(v => v.isActive) && <small>Giá từ</small>}</td><td>{costLabel(f)}<small>{f.variants.some(v => v.isActive) ? 'Theo size' : f.hasRecipe ? 'Theo công thức' : 'Nhập tay'}</small></td><td>{f.availableQuantity == null ? '—' : `${f.availableQuantity} phần`}</td><td><button className={`mc-badge ${f.isActive ? '' : 'off'}`} disabled={busy || !can('MENU_EDIT')} onClick={() => run(() => api.put(`/Food/${f.id}/status`, { isActive: !f.isActive }))}>{f.isActive ? 'Đang bán' : 'Ngừng bán'}</button></td><td><div className="mc-row-actions"><button hidden={!can('MENU_EDIT')} aria-label="Yêu thích" disabled={busy} onClick={() => run(() => api.put(`/Food/${f.id}/favorite`, { isFavorite: !f.isFavorite }))}><Star size={17} fill={f.isFavorite ? '#e9a52a' : 'none'} /></button><button hidden={!can('MENU_EDIT')} aria-label={`Sửa ${f.name}`} onClick={() => edit(f)}><Pencil size={17} /></button><button hidden={!can('MENU_DELETE')} aria-label={`Xóa ${f.name}`} onClick={() => remove(f)}><Trash2 size={17} /></button></div></td></tr>)}</tbody></table></div>}
+      <div className="mc-pagination"><span>Trang {currentPage}/{pageCount}</span><button disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Trước</button><button disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Sau</button></div>
+    </main></div>
+    {form && <Modal width={860} title={form.id ? `${can('MENU_EDIT') ? 'Chỉnh sửa' : 'Thông tin'} · ${form.name}` : 'Thêm món mới'} onClose={() => { if (!busy) setForm(null) }} footer={<><span className="mc-muted">Đơn đã gọi giữ nguyên giá và công thức.</span><button disabled={busy} onClick={() => setForm(null)}>Đóng</button><button hidden={!can(form?.id ? 'MENU_EDIT' : 'MENU_CREATE')} disabled={busy} className="mc-primary" onClick={save}>{busy ? 'Đang lưu...' : 'Lưu món'}</button></>}><div className="mc-tabs">{[['info', 'Thông tin món'], ['recipe', 'Size & công thức'], ['toppings', 'Topping đi kèm']].map(([id, text]) => <button key={id} className={formTab === id ? 'selected' : ''} onClick={() => setFormTab(id)}>{text}</button>)}</div>
+      {msg && <p className="mc-form-error">{msg}</p>}
+      {formTab === 'info' && <fieldset disabled={!can(form.id ? 'MENU_EDIT' : 'MENU_CREATE')} style={{border:0,padding:0,margin:0}}><div className="mc-form-info"><div className="mc-photo">{form.imageUrl ? <img src={form.imageUrl} alt="Ảnh món" /> : <Coffee size={62} />}<label><ImagePlus size={17} /> Chọn ảnh<input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={image} /></label>{form.imageUrl && <button onClick={() => change('imageUrl', null)}>Bỏ ảnh</button>}<small>JPG, PNG, WebP · tối đa 2 MB</small></div><div className="mc-form-grid"><label className="wide">Tên món *<input value={form.name} maxLength={150} onChange={e => change('name', e.target.value)} placeholder="Ví dụ: Cà phê sữa" /></label><label>Mã món<input value={form.code} maxLength={100} onChange={e => change('code', e.target.value)} placeholder="Tự tạo nếu để trống" /></label><label>Nhóm món *<select value={form.idCategory} onChange={e => change('idCategory', Number(e.target.value))}><option value="0">Chọn nhóm</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Phân loại<select value={form.menuKind} onChange={e => change('menuKind', e.target.value)}>{['Đồ uống', 'Đồ ăn', 'Dịch vụ', 'Khác'].map(k => <option key={k}>{k}</option>)}</select></label><label>Loại món<select value={form.itemType} onChange={e => change('itemType', e.target.value)}><option value="">Chưa phân loại</option>{types.map(t => <option key={t.id}>{t.name}</option>)}</select></label><label>Giá bán mặc định (đ)<input type="number" min="0" value={form.price} onChange={e => change('price', Number(e.target.value))} /></label><label className="mc-check"><input type="checkbox" checked={form.isActive} onChange={e => change('isActive', e.target.checked)} /> Đang bán</label><label className="mc-check"><input type="checkbox" checked={form.isTopping} disabled={form.variants.length > 0 || form.toppingIds.length > 0} onChange={e => change('isTopping', e.target.checked)} /> Là topping</label><label className="mc-check"><input type="checkbox" checked={form.isFavorite} onChange={e => change('isFavorite', e.target.checked)} /> Món yêu thích</label><label className="wide">Mô tả<textarea rows={3} maxLength={1000} value={form.description} onChange={e => change('description', e.target.value)} /></label></div></div></fieldset>}
+      {formTab === 'recipe' && <fieldset disabled={!can(form.id ? 'MENU_EDIT' : 'MENU_CREATE')} style={{border:0,padding:0,margin:0}}><p className="mc-muted">Định lượng cùng đơn vị với nguyên liệu trong kho. Nếu dùng size, mỗi size có công thức riêng.</p><RecipeEditor ingredients={ingredients} value={form.recipe} onChange={v => change('recipe', v)} fallback={form.costPrice} onFallback={v => change('costPrice', v)} />{!form.isTopping && <><div className="mc-section-title"><h3>Các size</h3><button onClick={() => change('variants', [...form.variants, { id: 0, name: '', price: form.price, costPrice: form.costPrice, isActive: true, recipe: [] }])}><Plus size={16} /> Thêm size</button></div>{form.variants.map((v, index) => { const update = (key, value) => change('variants', form.variants.map((x, j) => j === index ? { ...x, [key]: value } : x)); return <div className="mc-variant" key={index}><div className="mc-variant-head"><label>Tên size<input value={v.name} onChange={e => update('name', e.target.value)} placeholder="S / M / L" /></label><label>Giá bán<input type="number" min="0" value={v.price} onChange={e => update('price', Number(e.target.value))} /></label><label className="mc-check"><input type="checkbox" checked={v.isActive} onChange={e => update('isActive', e.target.checked)} /> Đang bán</label><button aria-label="Bỏ size" onClick={() => change('variants', form.variants.filter((_, j) => j !== index))}><Trash2 size={17} /></button></div><RecipeEditor ingredients={ingredients} value={v.recipe} onChange={r => update('recipe', r)} fallback={v.costPrice} onFallback={c => update('costPrice', c)} /></div> })}</>}</fieldset>}
+      {formTab === 'toppings' && (form.isTopping ? <p>Topping không có topping đi kèm.</p> : <><p className="mc-muted">Chọn topping được phép thêm. Khi gọi món, thu ngân chọn số phần và giá tự cộng.</p><div className="mc-topping-list">{foods.filter(f => f.isTopping && (f.isActive || form.toppingIds.includes(f.id)) && f.id !== form.id).map(f => <label key={f.id}><input disabled={!can(form.id ? 'MENU_EDIT' : 'MENU_CREATE')} type="checkbox" checked={form.toppingIds.includes(f.id)} onChange={e => change('toppingIds', e.target.checked ? [...form.toppingIds, f.id] : form.toppingIds.filter(id => id !== f.id))} /><span>{f.name}{!f.isActive && ' (ngừng bán)'}</span><b>+{money(f.price)} đ</b></label>)}</div>{!foods.some(f => f.isTopping) && <p>Chưa có topping. Tạo món mới và đánh dấu “Là topping” trước.</p>}</>)}
+    </Modal>}
+    {dialog?.kind === 'delete' && <Modal title="Xóa khỏi thực đơn" onClose={() => setDialog(null)} footer={<><button onClick={() => setDialog(null)}>Đóng</button><button hidden={!can('MENU_DELETE')} className="mc-danger" disabled={busy} onClick={() => run(async () => { const { data } = await api.delete(`/Food/${dialog.food.id}`); setDialog(null); setMsg(data.message) })}>Xác nhận</button></>}><p>Xóa <b>{dialog.food.name}</b>?</p><p>Món có lịch sử bán hàng hoặc đang dùng làm topping sẽ được ngừng bán để giữ dữ liệu.</p></Modal>}
+    {dialog?.kind === 'groups' && <Modal width={600} title="Nhóm & loại món" onClose={() => setDialog(null)}><div className="mc-tabs">{[['FoodCategory', 'Nhóm món'], ['ItemType', 'Loại món']].map(([id, name]) => <button key={id} className={groupTab === id ? 'selected' : ''} onClick={() => { setGroupTab(id); setGroupEdit(null); setGroupName('') }}>{name}</button>)}</div><div className="mc-inline"><input placeholder="Tên nhóm / loại" value={groupName} onChange={e => setGroupName(e.target.value)} /><button hidden={!can('MENU_GROUPS')} className="mc-primary" disabled={busy || !groupName.trim()} onClick={() => run(async () => { if (groupEdit) await api.put(`/${groupTab}/${groupEdit}`, { name: groupName }); else await api.post(`/${groupTab}`, { name: groupName }); setGroupName(''); setGroupEdit(null) }, 'Đã lưu phân nhóm.')}>{groupEdit ? 'Lưu tên' : 'Thêm'}</button>{groupEdit && <button onClick={() => { setGroupEdit(null); setGroupName('') }}>Hủy sửa</button>}</div>{msg && <p className="mc-form-error">{msg}</p>}{(groupTab === 'FoodCategory' ? categories : types).map(c => <div className="mc-group-row" key={c.id}><span>{c.name}</span><button hidden={!can('MENU_GROUPS')} aria-label="Sửa tên" onClick={() => { setGroupEdit(c.id); setGroupName(c.name) }}><Pencil size={16} /></button><button hidden={!can('MENU_GROUPS')} aria-label="Xóa nhóm trống" disabled={busy} onClick={() => run(() => api.delete(`/${groupTab}/${c.id}`), 'Đã xóa phân nhóm trống.')}><Trash2 size={16} /></button></div>)}</Modal>}
+    {dialog?.kind === 'stock' && <Modal width={900} title="Nguyên liệu & kho" onClose={() => setDialog(null)}><div className="mc-tabs"><button className={stockTab === 'ingredients' ? 'selected' : ''} onClick={() => setStockTab('ingredients')}>Nguyên liệu</button><button className={stockTab === 'movements' ? 'selected' : ''} onClick={() => setStockTab('movements')}>Nhật ký kho</button></div>{msg && <p className="mc-form-error">{msg}</p>}{stockTab === 'ingredients' ? <><button hidden={!can('INVENTORY_EDIT')} onClick={() => setIngredientForm({ name: '', unit: 'g', quantity: 0, minQuantity: 0, unitCost: 0 })}><Plus size={16} /> Thêm nguyên liệu</button>{ingredientForm && <div className="mc-ingredient-form"><div className="mc-form-grid">{[['name', 'Tên nguyên liệu'], ['unit', 'Đơn vị'], ['quantity', 'Tồn kho'], ['minQuantity', 'Mức cảnh báo'], ['unitCost', 'Giá vốn / 1 đơn vị (đ)']].map(([key, label]) => <label key={key}>{label}<input type={['name', 'unit'].includes(key) ? 'text' : 'number'} min="0" step="any" disabled={!!ingredientForm.id && ['quantity', 'unitCost'].includes(key)} value={ingredientForm[key]} onChange={e => setIngredientForm(f => ({ ...f, [key]: ['name', 'unit'].includes(key) ? e.target.value : Number(e.target.value) }))} /></label>)}</div><div className="mc-inline"><button hidden={!can('INVENTORY_EDIT')} className="mc-primary" disabled={busy} onClick={() => run(async () => { if (ingredientForm.id) await api.put(`/Inventory/ingredients/${ingredientForm.id}`, ingredientForm); else await api.post('/Inventory/ingredients', ingredientForm); setIngredientForm(null); const { data } = await api.get('/Inventory/movements'); setMovements(data) }, 'Đã lưu nguyên liệu.')}>Lưu nguyên liệu</button><button onClick={() => setIngredientForm(null)}>Hủy sửa</button></div></div>}<table className="mc-table"><thead><tr><th>Nguyên liệu</th><th>Đơn vị</th><th>Tồn kho</th><th>Cảnh báo</th><th>Giá vốn / đơn vị</th><th /></tr></thead><tbody>{ingredients.map(i => <tr key={i.id}><td>{i.name}</td><td>{i.unit}</td><td className={i.quantity <= i.minQuantity ? 'mc-low' : ''}>{money(i.quantity)}</td><td>{money(i.minQuantity)}</td><td>{money(i.unitCost)} đ</td><td><button hidden={!can('INVENTORY_EDIT')} onClick={() => setIngredientForm({ ...i })}><Pencil size={16} /></button></td></tr>)}</tbody></table><p className="mc-muted">Tồn kho và giá vốn hiện tại được quản lý bằng phiếu nhập/kiểm kê ở Kho hàng. Giá vốn tính trên cùng đơn vị với công thức.</p></> : <><p className="mc-muted">200 giao dịch gần nhất. “Hao hụt” chỉ ghi nhận phần đã xuất, không trừ kho lần nữa.</p><table className="mc-table"><thead><tr><th>Thời gian</th><th>Nguyên liệu</th><th>Biến động / hao hụt</th><th>Loại</th><th>Ghi chú</th></tr></thead><tbody>{movements.map(m => <tr key={m.id}><td>{new Date(m.createdAt).toLocaleString('vi-VN')}</td><td>{m.ingredientName}</td><td>{m.quantity > 0 ? '+' : ''}{money(m.quantity)} {m.unit}</td><td>{{ Kitchen: 'Báo bếp', Return: 'Hoàn kho', Waste: 'Hao hụt', Adjustment: 'Điều chỉnh', Import: 'Nhập kho', Opening: 'Tồn đầu', Count: 'Kiểm kê', Export: 'Xuất kho', Disposal: 'Hủy nguyên liệu' }[m.kind] || m.kind}</td><td>{m.note}</td></tr>)}</tbody></table>{!movements.length && <p>Chưa có giao dịch kho.</p>}</>}</Modal>}
+    {dialog?.kind === 'import' && <Modal width={750} title="Kiểm tra file nhập thực đơn" onClose={() => setDialog(null)} footer={<><button onClick={() => setDialog(null)}>Đóng</button><button hidden={!can('MENU_IMPORT')} disabled={busy || !importResult?.valid} className="mc-primary" onClick={() => run(async () => { const { data } = await api.post('/Food/import', { items: importRows, preview: false }); if (!data.valid) { setImportResult(data); return } setDialog(null) }, `Đã nhập ${importRows.length} món.`)}>Nhập {importRows.length} món</button></>}><p>File nhập tạo món mới. Mã trùng sẽ bị chặn; nhóm và loại món cần tạo trước. Size, ảnh, topping và công thức bổ sung trong màn hình sửa món.</p>{importResult?.valid ? <p className="mc-success">Tất cả dòng hợp lệ, sẵn sàng nhập.</p> : importResult?.errors.map((e, index) => <p className="mc-form-error" key={index}>Dòng {e.row}: {e.message}</p>)}<table className="mc-table"><thead><tr><th>Mã</th><th>Tên món</th><th>Giá bán</th></tr></thead><tbody>{importRows.slice(0, 20).map((r, index) => <tr key={index}><td>{r.code}</td><td>{r.name}</td><td>{money(r.price)} đ</td></tr>)}</tbody></table>{importRows.length > 20 && <p>Hiển thị 20 dòng đầu trong {importRows.length} dòng.</p>}</Modal>}
+  </div>
+}

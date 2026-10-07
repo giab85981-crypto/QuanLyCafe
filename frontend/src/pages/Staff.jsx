@@ -1,202 +1,58 @@
-import { useEffect, useState } from 'react'
+import { can, useAccess } from '../utils/staffAccess'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Users, UserCheck, UserX, Search, Plus, Download, ShieldCheck } from 'lucide-react'
+import * as XLSX from 'xlsx'
+import { staffWorkbook } from '../utils/staffExcel'
 import axiosClient from '../api/axiosClient'
 import { errMsg } from '../api/errMsg'
 import Modal from '../components/Modal'
 import './Page.css'
-
-// Backend chưa có API lấy danh sách vai trò. Id theo thứ tự DbSeeder tạo: Admin=1, Cashier=2, Kitchen=3
-const ROLES = [
-  { id: 1, label: 'Quản trị viên' },
-  { id: 2, label: 'Thu ngân' },
-  { id: 3, label: 'Bếp / Pha chế' },
-]
-
-const EMPTY_FORM = { userName: '', passWord: '', displayName: '', idRole: 2 }
-
-function Staff() {
+import './Staff.css'
+const labels = { Admin: 'Quản trị viên', Cashier: 'Thu ngân', Kitchen: 'Bếp / Pha chế' }
+const empty = { name: '', phone: '', email: '', address: '', gender: '', birthday: '', hireDate: '', department: '', position: '', note: '', userName: '' }
+const date = value => value ? value.slice(0, 10) : ''
+export default function Staff() {
+  useAccess()
+  const [data, setData] = useState({ items: [], departments: [], positions: [], working: 0, retired: 0 })
+  const [filters, setFilters] = useState({ search: '', active: 'true', department: '', position: '' })
+  const [accounts, setAccounts] = useState([]), [roles, setRoles] = useState([])
+  const [loading, setLoading] = useState(true), [error, setError] = useState(''), [notice, setNotice] = useState('')
+  const [modal, setModal] = useState(null), [form, setForm] = useState(empty), [formError, setFormError] = useState(''), [busy, setBusy] = useState(false), [history, setHistory] = useState([])
+  const [page, setPage] = useState(1), [download, setDownload] = useState('')
+  const sequence = useRef(0)
   const me = JSON.parse(localStorage.getItem('user') || '{}')
-  const [list, setList] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  const [modal, setModal] = useState(null) // null | { mode: 'create' | 'edit', form }
-  const [formError, setFormError] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  const load = () =>
-    axiosClient
-      .get('/Account')
-      .then((r) => {
-        setList(r.data)
-        setError('')
-      })
-      .catch((e) => setError(errMsg(e, 'Không tải được danh sách nhân viên.')))
-      .finally(() => setLoading(false))
-
-  useEffect(() => {
-    load()
-  }, [])
-
-  const openCreate = () => {
-    setFormError('')
-    setModal({ mode: 'create', form: { ...EMPTY_FORM } })
-  }
-
-  const openEdit = (a) => {
-    setFormError('')
-    setModal({ mode: 'edit', form: { userName: a.userName, passWord: '', displayName: a.displayName, idRole: a.idRole } })
-  }
-
-  const setField = (patch) => setModal((m) => ({ ...m, form: { ...m.form, ...patch } }))
-
-  const submit = async () => {
-    const f = modal.form
-    if (!f.displayName.trim()) return setFormError('Nhập tên hiển thị.')
-    if (modal.mode === 'create') {
-      if (!f.userName.trim()) return setFormError('Nhập tên đăng nhập.')
-      if (list.some((a) => a.userName.toLowerCase() === f.userName.trim().toLowerCase()))
-        return setFormError('Tên đăng nhập đã tồn tại.')
-      if (f.passWord.length < 6) return setFormError('Mật khẩu phải có ít nhất 6 ký tự.')
-    } else if (f.passWord && f.passWord.length < 6) {
-      return setFormError('Mật khẩu mới phải có ít nhất 6 ký tự.')
-    }
-
-    setSaving(true)
+  const load = useCallback(async () => {
+    const ticket = ++sequence.current; setLoading(true)
+    try { const [employees, users, roleList] = await Promise.all([axiosClient.get('/Employee', { params: Object.fromEntries(Object.entries(filters).filter(([,v]) => v !== '')) }), axiosClient.get('/Account'), axiosClient.get('/Account/roles')]); if (ticket === sequence.current) { setData(employees.data); setAccounts(users.data); setRoles(roleList.data); setError('') } }
+    catch (e) { if (ticket === sequence.current) setError(errMsg(e, 'Không tải được nhân viên.')) }
+    finally { if (ticket === sequence.current) setLoading(false) }
+  }, [filters])
+  useEffect(() => { const timer = setTimeout(load, 200); return () => { clearTimeout(timer); sequence.current++ } }, [load])
+  useEffect(() => () => { if (download) URL.revokeObjectURL(download) }, [download])
+  const filter = (key, value) => { setLoading(true); setPage(1); setFilters(f => ({ ...f, [key]: value })); setDownload('') }
+  const open = (employee = null) => { setFormError(''); setHistory([]); setForm(employee ? { ...employee, birthday: date(employee.birthday), hireDate: date(employee.hireDate), userName: employee.userName || '' } : { ...empty }); setModal({ kind: 'profile', employee }); if (employee) axiosClient.get(`/Employee/${employee.id}/activities`).then(r => setHistory(r.data)).catch(() => setFormError('Không tải được lịch sử.')) }
+  const login = employee => { setModal({ kind: 'login', employee }); setFormError(''); setForm({ userName: employee.userName || '', passWord: '', displayName: employee.name, idRole: employee.idRole || roles.find(r => r.name === 'Cashier')?.id || roles[0]?.id }) }
+  const save = async e => {
+    e.preventDefault(); setBusy(true); setFormError('')
     try {
-      if (modal.mode === 'create') {
-        await axiosClient.post('/Account', {
-          userName: f.userName.trim(),
-          passWord: f.passWord,
-          displayName: f.displayName.trim(),
-          idRole: Number(f.idRole),
-        })
-      } else {
-        await axiosClient.put(`/Account/${encodeURIComponent(f.userName)}`, {
-          displayName: f.displayName.trim(),
-          idRole: Number(f.idRole),
-          passWord: f.passWord || null,
-        })
-      }
-      setModal(null)
-      load()
-    } catch (e) {
-      setFormError(errMsg(e, 'Không lưu được nhân viên.'))
-    } finally {
-      setSaving(false)
-    }
+      if (modal.kind === 'profile') { const body = { ...form, birthday: form.birthday || null, hireDate: form.hireDate || null, userName: form.userName || null }; if (modal.employee) await axiosClient.put(`/Employee/${modal.employee.id}`, body); else await axiosClient.post('/Employee', body) }
+      else if (modal.employee.userName) await axiosClient.put(`/Account/${encodeURIComponent(modal.employee.userName)}`, { displayName: form.displayName, idRole: Number(form.idRole), passWord: form.passWord || null })
+      else await axiosClient.post(`/Employee/${modal.employee.id}/login`, { ...form, idRole: Number(form.idRole) })
+      setModal(null); setNotice('Đã lưu thay đổi.'); await load()
+    } catch (e) { setFormError(errMsg(e, 'Không lưu được thông tin.')) } finally { setBusy(false) }
   }
-
-  const toggleActive = async (a) => {
-    try {
-      await axiosClient.put(`/Account/${encodeURIComponent(a.userName)}/status`, { isActive: !a.isActive })
-      load()
-    } catch (e) {
-      setError(errMsg(e, 'Không đổi được trạng thái tài khoản.'))
-    }
-  }
-
-  const remove = async (a) => {
-    if (!window.confirm(`Xóa tài khoản "${a.userName}"? Thao tác này không hoàn tác được.`)) return
-    try {
-      await axiosClient.delete(`/Account/${encodeURIComponent(a.userName)}`)
-      load()
-    } catch (e) {
-      setError(errMsg(e, 'Không xóa được tài khoản.'))
-    }
-  }
-
-  return (
-    <div className="pg">
-      <div className="pg-head">
-        <h1>Nhân viên</h1>
-        <button className="pg-btn pg-btn--primary" onClick={openCreate}>+ Thêm nhân viên</button>
-      </div>
-
-      {error && <div className="pg-error">{error}</div>}
-
-      <div className="pg-card pg-table-wrap">
-        <table className="pg-table">
-          <thead>
-            <tr>
-              <th>Tên đăng nhập</th>
-              <th>Tên hiển thị</th>
-              <th>Vai trò</th>
-              <th>Trạng thái</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <tr><td colSpan="5" className="pg-empty">Đang tải...</td></tr>}
-            {!loading && list.length === 0 && !error && <tr><td colSpan="5" className="pg-empty">Chưa có nhân viên nào.</td></tr>}
-            {list.map((a) => {
-              const isMe = a.userName === me.userName
-              return (
-                <tr key={a.userName}>
-                  <td>{a.userName}{isMe && <span className="pg-mute"> (bạn)</span>}</td>
-                  <td>{a.displayName}</td>
-                  <td>{a.roleName}</td>
-                  <td>
-                    <span className={`pg-badge ${a.isActive ? 'pg-badge--ok' : 'pg-badge--mute'}`}>
-                      {a.isActive ? 'Đang làm việc' : 'Đã khóa'}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="actions">
-                      <button className="pg-btn pg-btn--sm" onClick={() => openEdit(a)}>Sửa</button>
-                      <button className="pg-btn pg-btn--sm" disabled={isMe} onClick={() => toggleActive(a)}>
-                        {a.isActive ? 'Khóa' : 'Mở khóa'}
-                      </button>
-                      <button className="pg-btn pg-btn--sm pg-btn--danger" disabled={isMe} onClick={() => remove(a)}>Xóa</button>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {modal && (
-        <Modal
-          title={modal.mode === 'create' ? 'Thêm nhân viên' : `Sửa nhân viên: ${modal.form.userName}`}
-          onClose={() => setModal(null)}
-          footer={
-            <>
-              <button className="pg-btn" onClick={() => setModal(null)}>Hủy</button>
-              <button className="pg-btn pg-btn--primary" onClick={submit} disabled={saving}>
-                {saving ? 'Đang lưu...' : 'Lưu'}
-              </button>
-            </>
-          }
-        >
-          {formError && <div className="pg-error">{formError}</div>}
-          {modal.mode === 'create' && (
-            <div className="field">
-              <label htmlFor="un">Tên đăng nhập</label>
-              <input id="un" autoFocus value={modal.form.userName} onChange={(e) => setField({ userName: e.target.value })} />
-            </div>
-          )}
-          <div className="field">
-            <label htmlFor="dn">Tên hiển thị</label>
-            <input id="dn" value={modal.form.displayName} onChange={(e) => setField({ displayName: e.target.value })} />
-          </div>
-          <div className="field">
-            <label htmlFor="rl">Vai trò</label>
-            <select id="rl" value={modal.form.idRole} onChange={(e) => setField({ idRole: e.target.value })}>
-              {ROLES.map((r) => (
-                <option key={r.id} value={r.id}>{r.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="pw">{modal.mode === 'create' ? 'Mật khẩu' : 'Mật khẩu mới'}</label>
-            <input id="pw" type="password" autoComplete="new-password" value={modal.form.passWord} onChange={(e) => setField({ passWord: e.target.value })} />
-            {modal.mode === 'edit' && <span className="field__hint">Để trống nếu không muốn đổi mật khẩu.</span>}
-          </div>
-        </Modal>
-      )}
-    </div>
-  )
+  const status = async () => { setBusy(true); setFormError(''); try { const e = modal.employee; if (modal.kind === 'status') await axiosClient.put(`/Employee/${e.id}/status`, { isActive: !e.isActive }); else await axiosClient.put(`/Account/${encodeURIComponent(e.userName)}/status`, { isActive: !e.accountActive }); setModal(null); setNotice('Đã cập nhật trạng thái.'); await load() } catch (e) { setFormError(errMsg(e)) } finally { setBusy(false) } }
+  const excel = () => { const book = staffWorkbook(data.items); const url = URL.createObjectURL(new Blob([XLSX.write(book, { type: 'array', bookType: 'xlsx' })], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); setDownload(url) }
+  const input = (key, label, type = 'text', maxLength = 100) => <label className="field" key={key}>{label}<input type={type} maxLength={maxLength} required={key === 'name'} value={form[key] || ''} onInput={e => { const value = e.currentTarget.value; setForm(f => ({ ...f, [key]: value })) }} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} /></label>
+  return <main className="pg staff-page">
+    <div className="pg-head"><div><span className="staff-eyebrow">ĐỘI NGŨ CỦA QUÁN</span><h1>Nhân viên</h1><p className="pg-mute">Hồ sơ rõ ràng, tài khoản đúng vai trò.</p></div><div className="pg-tools"><button className="pg-btn" disabled={loading || !data.items.length} onClick={excel}><Download size={16}/> Xuất Excel</button>{download && <a className="pg-btn" href={download} download="nhan-vien.xlsx">Tải file Excel</a>}<button hidden={!can('STAFF_CREATE')} className="pg-btn pg-btn--primary" onClick={() => open()}><Plus size={17}/> Thêm nhân viên</button></div></div>
+    <div className="staff-stats"><article><Users/><div><small>Tổng nhân viên</small><b>{data.working + data.retired}</b></div></article><article><UserCheck/><div><small>Đang làm việc</small><b>{data.working}</b></div></article><article><UserX/><div><small>Đã nghỉ việc</small><b>{data.retired}</b></div></article><article><ShieldCheck/><div><small>Tài khoản đang mở</small><b>{accounts.filter(a => a.isActive).length}</b></div></article></div>
+    {error && <p className="pg-error" role="alert">{error}</p>}{notice && <div className="staff-notice" role="status">{notice}<button onClick={() => setNotice('')}>×</button></div>}
+    <div className="staff-layout"><aside className="pg-card staff-filters"><h3>Bộ lọc nhân viên</h3><label className="field">Trạng thái<select value={filters.active} onChange={e => filter('active', e.target.value)}><option value="true">Đang làm việc</option><option value="false">Đã nghỉ việc</option><option value="">Tất cả</option></select></label>{[['department','Bộ phận',data.departments],['position','Chức danh',data.positions]].map(([key,label,options]) => <label className="field" key={key}>{label}<select value={filters[key]} onChange={e => filter(key,e.target.value)}><option value="">Tất cả</option>{options.map(x => <option key={x}>{x}</option>)}</select></label>)}<div className="staff-tip"><ShieldCheck size={20}/><p>Nhân viên có thể chưa cần tài khoản. Quản trị viên cấp quyền đăng nhập khi cần.</p></div></aside>
+    <section className="pg-card pg-table-wrap"><div className="staff-search"><Search size={18}/><input aria-label="Tìm nhân viên" placeholder="Tìm mã, họ tên, điện thoại, tài khoản..." value={filters.search} onChange={e => filter('search',e.target.value)}/><span>{data.total || 0} kết quả</span></div><table className="pg-table"><thead><tr><th>Nhân viên</th><th>Liên hệ</th><th>Công việc</th><th>Đăng nhập</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>{loading ? <tr><td colSpan={6} className="pg-empty">Đang tải...</td></tr> : data.items.slice((page-1)*12,page*12).map(e => <tr key={e.id}><td><button className="staff-name" onClick={() => open(e)}><span className="staff-avatar">{e.name.trim().slice(0,1).toUpperCase()}</span><span><b>{e.name}</b><small>{e.code}</small></span></button></td><td>{e.phone || '—'}<small>{e.email}</small></td><td>{e.position || '—'}<small>{e.department}</small></td><td>{e.userName ? <><b>{e.userName}</b><small>{labels[e.roleName] || e.roleName} · {e.accountActive ? 'Đang mở' : 'Đã khóa'}</small></> : <small>Chưa cấp tài khoản</small>}</td><td><span className={`pg-badge ${e.isActive ? 'pg-badge--ok' : 'pg-badge--mute'}`}>{e.isActive ? 'Đang làm' : 'Nghỉ việc'}</span></td><td><div className="staff-actions"><button className="pg-btn pg-btn--sm" onClick={() => open(e)}>Hồ sơ</button><button hidden={!can('STAFF_ACCOUNTS')} className="pg-btn pg-btn--sm" disabled={!e.isActive} onClick={() => login(e)}>{e.userName ? 'Tài khoản' : 'Cấp đăng nhập'}</button><button hidden={!can('STAFF_STATUS')} className="pg-btn pg-btn--sm" disabled={e.userName === me.userName} onClick={() => { setFormError(''); setModal({kind:'status',employee:e}) }}>{e.isActive ? 'Nghỉ việc' : 'Đi làm lại'}</button>{e.userName && <button hidden={!can('STAFF_ACCOUNTS')} className="pg-btn pg-btn--sm" disabled={e.userName === me.userName || !e.isActive} onClick={() => { setFormError(''); setModal({kind:'accountStatus',employee:e}) }}>{e.accountActive ? 'Khóa đăng nhập' : 'Mở đăng nhập'}</button>}</div></td></tr>)}{!loading && !data.items.length && <tr><td colSpan={6} className="pg-empty">Chưa có nhân viên phù hợp.</td></tr>}</tbody></table><div className="staff-pagination"><button className="pg-btn" disabled={page <= 1} onClick={() => setPage(p => p-1)}>Trước</button><span>Trang {page} / {Math.max(1,Math.ceil(data.items.length/12))}</span><button className="pg-btn" disabled={page*12 >= data.items.length} onClick={() => setPage(p => p+1)}>Sau</button></div></section></div>
+    {modal && <Modal width={modal.kind === 'profile' ? 760 : 480} title={modal.kind === 'profile' ? modal.employee ? `Hồ sơ ${modal.employee.code}` : 'Thêm nhân viên' : modal.kind === 'login' ? 'Tài khoản đăng nhập' : 'Xác nhận thay đổi trạng thái'} onClose={() => { if (!busy) setModal(null) }} footer={<><button className="pg-btn" disabled={busy} onClick={() => setModal(null)}>Bỏ qua</button><button hidden={!can(modal.kind === 'profile' ? modal.employee ? 'STAFF_EDIT' : 'STAFF_CREATE' : modal.kind === 'status' ? 'STAFF_STATUS' : 'STAFF_ACCOUNTS')} className="pg-btn pg-btn--primary" disabled={busy} type={['profile','login'].includes(modal.kind) ? 'submit' : 'button'} form="staff-form" onClick={['profile','login'].includes(modal.kind) ? undefined : status}>{busy ? 'Đang lưu...' : 'Xác nhận lưu'}</button></>}>
+      {formError && <p className="pg-error" role="alert">{formError}</p>}
+      {modal.kind === 'profile' ? <form id="staff-form" onSubmit={save}><fieldset disabled={!can(modal.employee ? 'STAFF_EDIT' : 'STAFF_CREATE')} style={{border:0,padding:0,margin:0}}><h4>Thông tin cá nhân</h4><div className="staff-form-grid">{input('name','Họ và tên *')}{input('phone','Điện thoại','tel',20)}{input('email','Email','email',120)}<label className="field">Giới tính<select value={form.gender} onChange={e => setForm(f => ({...f,gender:e.target.value}))}><option value="">Chưa chọn</option>{['Nam','Nữ','Khác'].map(x => <option key={x}>{x}</option>)}</select></label>{input('birthday','Ngày sinh','date')}{input('address','Địa chỉ','text',255)}</div><h4>Thông tin công việc</h4><div className="staff-form-grid">{input('department','Bộ phận','text',80)}{input('position','Chức danh','text',80)}{input('hireDate','Ngày vào làm','date')}<label className="field">Tài khoản hiện có<select disabled={!can('STAFF_ACCOUNTS') || !!modal.employee?.userName} value={form.userName} onChange={e => setForm(f => ({...f,userName:e.target.value}))}><option value="">Chưa gắn tài khoản</option>{accounts.filter(a => !a.linked || a.userName === form.userName).map(a => <option key={a.userName} value={a.userName}>{a.userName} · {a.displayName}</option>)}</select></label></div><label className="field">Ghi chú<textarea maxLength={1000} value={form.note} onChange={e => setForm(f => ({...f,note:e.target.value}))}/></label>{modal.employee && <details><summary>Lịch sử thay đổi ({history.length})</summary>{history.map(h => <p key={h.id}>{new Date(h.createdAt+'Z').toLocaleString('vi-VN')} · {h.actor} · {h.action}</p>)}</details>}</fieldset></form> : modal.kind === 'login' ? <form id="staff-form" onSubmit={save}><p>{modal.employee.name}</p><label className="field">Tên đăng nhập<input required disabled={!!modal.employee.userName} pattern="[a-zA-Z0-9_.-]{3,100}" maxLength={100} value={form.userName} onChange={e => setForm(f => ({...f,userName:e.target.value}))}/></label><label className="field">Vai trò<select value={form.idRole} onChange={e => setForm(f => ({...f,idRole:e.target.value}))}>{roles.map(r => <option key={r.id} value={r.id}>{labels[r.name] || r.name}</option>)}</select></label><p className="pg-mute">Quyền thao tác được cấu hình tại trang Phân quyền. Nhân viên kế thừa nhóm và có thể có quyền riêng.</p><label className="field">{modal.employee.userName ? 'Mật khẩu mới (để trống nếu giữ nguyên)' : 'Mật khẩu *'}<input type="password" autoComplete="new-password" required={!modal.employee.userName} minLength={8} value={form.passWord} onChange={e => setForm(f => ({...f,passWord:e.target.value}))}/></label><p className="pg-mute">Đổi mật khẩu hoặc khóa sẽ kết thúc phiên cũ. Đổi nhóm quyền áp dụng ngay khi đang đăng nhập.</p></form> : <p>{modal.kind === 'status' ? modal.employee.isActive ? `Cho ${modal.employee.name} nghỉ việc và khóa tài khoản? Hồ sơ, giao dịch vẫn được giữ.` : `Cho ${modal.employee.name} đi làm lại? Bạn cần mở đăng nhập riêng nếu cần.` : `${modal.employee.accountActive ? 'Khóa' : 'Mở'} đăng nhập của ${modal.employee.name}?`}</p>}
+    </Modal>}
+  </main>
 }
-
-export default Staff

@@ -1,0 +1,6 @@
+.tools/
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+*.bak

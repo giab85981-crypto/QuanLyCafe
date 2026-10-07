@@ -1,217 +1,60 @@
-﻿using CafeManagement.API.Data;
+using System.Security.Claims;
+using CafeManagement.API.Data;
 using CafeManagement.API.DTOs;
 using CafeManagement.API.Entities;
+using CafeManagement.API.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
-namespace CafeManagement.API.Controllers
+namespace CafeManagement.API.Controllers;
+[Authorize, ApiController, Route("api/[controller]")]
+public class InventoryController(AppDbContext db) : ControllerBase
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class InventoryController : ControllerBase
+    private string Actor => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "system";
+    [HttpGet("ingredients")]
+    public async Task<IActionResult> GetIngredients() => Ok(await db.Ingredients.OrderBy(i => i.Name).Select(i => new { i.Id, i.Name, i.Quantity, i.MinQuantity, i.Unit, i.UnitCost, i.IsActive }).ToListAsync());
+    [HttpGet("movements")]
+    public async Task<IActionResult> Movements() => Ok(await db.StockMovements.OrderByDescending(m => m.Id).Take(200).Select(m => new { m.Id, IngredientName = m.Ingredient.Name, Unit = m.Ingredient.Unit, m.Quantity, m.Kind, m.Note, m.CreatedAt }).ToListAsync());
+    [HttpPost("ingredients")] public async Task<IActionResult> CreateIngredient(IngredientWriteDto dto) => await Write(null, dto);
+    [HttpPut("ingredients/{id}")] public async Task<IActionResult> EditIngredient(int id, IngredientWriteDto dto) => await Write(id, dto);
+    private async Task<IActionResult> Write(int? id, IngredientWriteDto dto)
     {
-        private readonly AppDbContext _context;
-
-        public InventoryController(AppDbContext context)
+        try
         {
-            _context = context;
+            await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+            await new StockReservations(db).Lock();
+            var existing = id.HasValue ? await db.Ingredients.Include(i => i.Units).FirstOrDefaultAsync(i => i.Id == id) : null;
+            if (id.HasValue && existing == null) return NotFound();
+            var input = new WarehouseIngredientWrite { Name = dto.Name, Unit = dto.Unit, Quantity = dto.Quantity, MinQuantity = dto.MinQuantity, UnitCost = dto.UnitCost,
+                Code = existing?.Code ?? "", IdGroup = existing?.IdGroup, IsActive = existing?.IsActive ?? true, Units = existing?.Units.Select(u => new IngredientUnitWrite { Name = u.Name, Factor = u.Factor }).ToList() ?? new() };
+            var result = await new WarehouseCatalog(db).Save(input, id, Actor); await tx.CommitAsync(); return Ok(new { result.Id });
         }
-
-        // 1. Lấy danh sách nguyên liệu tồn kho
-        [HttpGet("ingredients")]
-        public async Task<IActionResult> GetIngredients()
+        catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+    }
+    [HttpPost("import")]
+    public async Task<IActionResult> ImportInventory(CreateImportReceiptDto dto)
+    {
+        try
         {
-            try
-            {
-                var ingredients = await _context.Ingredients
-                    .Select(static i => new IngredientDto
-                    {
-                        Id = i.Id,
-                        Name = i.Name,
-                        Quantity = i.Quantity,
-                        MinQuantity = i.MinQuantity,
-                        Unit = i.Unit
-                    })
-                    .ToListAsync();
-
-                return Ok(ingredients);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi khi lấy danh sách nguyên liệu!", detail = ex.Message });
-            }
+            var supplierId = dto.IdSupplier ?? (await db.Suppliers.FirstOrDefaultAsync(s => s.Name == dto.SupplierName))?.Id;
+            if (!supplierId.HasValue) return BadRequest("Tạo/chọn nhà cung cấp trong Kho hàng trước khi nhập.");
+            var input = new WarehouseImportWrite { IdSupplier = supplierId.Value, RequestKey = Guid.NewGuid().ToString("N"), Items = dto.Items.Select(i => new WarehouseImportLine { IdIngredient = i.IdIngredient, Quantity = i.Count, Price = i.Price }).ToList() };
+            var id = await new WarehouseFlow(db).Import(input, Actor); return Ok(new { idReceipt = id, message = "Đã nhập kho; phiếu chưa ghi nhận thanh toán." });
         }
-
-        // 2. Tạo phiếu nhập kho (ImportReceipt & ImportDetail)
-        [HttpPost("import")]
-        public async Task<IActionResult> ImportInventory([FromBody] CreateImportReceiptDto dto)
-        {
-            using var transaction = await _context.Database.BeginTransactionAsync();
-            try
-            {
-                if (dto.Items == null || !dto.Items.Any())
-                {
-                    return BadRequest(new { message = "Danh sách chi tiết nhập kho không được để trống!" });
-                }
-
-                // Xử lý Nhà cung cấp (Supplier)
-                int supplierId;
-                if (dto.IdSupplier.HasValue && dto.IdSupplier.Value > 0)
-                {
-                    var supplier = await _context.Suppliers.FindAsync(dto.IdSupplier.Value);
-                    if (supplier == null)
-                    {
-                        return BadRequest(new { message = "Nhà cung cấp không tồn tại!" });
-                    }
-                    supplierId = supplier.Id;
-                }
-                else if (!string.IsNullOrWhiteSpace(dto.SupplierName))
-                {
-                    var supplier = await _context.Suppliers.FirstOrDefaultAsync(s => s.Name == dto.SupplierName);
-                    if (supplier == null)
-                    {
-                        supplier = new Supplier { Name = dto.SupplierName };
-                        _context.Suppliers.Add(supplier);
-                        await _context.SaveChangesAsync();
-                    }
-                    supplierId = supplier.Id;
-                }
-                else
-                {
-                    return BadRequest(new { message = "Vui lòng chọn hoặc nhập tên Nhà cung cấp!" });
-                }
-
-                // Kiểm tra tài khoản nhân viên
-                if (string.IsNullOrWhiteSpace(dto.UserName))
-                {
-                    return BadRequest(new { message = "Vui lòng cung cấp UserName người lập phiếu!" });
-                }
-                var account = await _context.Accounts.FindAsync(dto.UserName);
-                if (account == null)
-                {
-                    return BadRequest(new { message = "Tài khoản người lập phiếu không tồn tại!" });
-                }
-
-                // Tính tổng tiền phiếu nhập
-                decimal totalAmount = (decimal)dto.Items.Sum(item => item.Count * (double)item.Price);
-
-                var receipt = new ImportReceipt
-                {
-                    IdSupplier = supplierId,
-                    UserName = dto.UserName,
-                    ImportDate = DateTime.Now,
-                    TotalAmount = totalAmount
-                };
-
-                _context.ImportReceipts.Add(receipt);
-                await _context.SaveChangesAsync();
-
-                foreach (var item in dto.Items)
-                {
-                    var ingredient = await _context.Ingredients.FindAsync(item.IdIngredient);
-                    if (ingredient == null)
-                    {
-                        await transaction.RollbackAsync();
-                        return NotFound(new { message = $"Không tìm thấy nguyên liệu có ID {item.IdIngredient}!" });
-                    }
-
-                    // Thêm chi tiết phiếu nhập (ImportDetail)
-                    var detail = new ImportDetail
-                    {
-                        IdImportReceipt = receipt.Id,
-                        IdIngredient = item.IdIngredient,
-                        Count = item.Count
-                    };
-                    _context.ImportDetails.Add(detail);
-
-                    // Cộng dồn vào kho nguyên liệu
-                    ingredient.Quantity += item.Count;
-                }
-
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                return Ok(new { message = "Nhập kho thành công!", idReceipt = receipt.Id });
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync();
-                return StatusCode(500, new { message = "Lỗi trong quá trình nhập kho!", detail = ex.Message });
-            }
-        }
-
-        // 3. Xem danh sách công thức của các món
-        [HttpGet("recipe")]
-        public async Task<IActionResult> GetRecipes([FromQuery] int? foodId)
-        {
-            try
-            {
-                var query = _context.Foods.AsQueryable();
-
-                if (foodId.HasValue)
-                {
-                    query = query.Where(f => f.Id == foodId.Value);
-                }
-
-                var recipes = await query
-                    .Select(f => new RecipeDto
-                    {
-                        IdFood = f.Id,
-                        FoodName = f.Name,
-                        Ingredients = f.Recipes.Select(r => new RecipeItemDto
-                        {
-                            IdIngredient = r.IdIngredient,
-                            IngredientName = r.Ingredient.Name,
-                            Amount = r.Amount,
-                            Unit = r.Ingredient.Unit
-                        }).ToList()
-                    })
-                    .ToListAsync();
-
-                return Ok(recipes);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Lỗi khi lấy công thức món!", detail = ex.Message });
-            }
-        }
-
-        // 4. Thiết lập / Cập nhật công thức cho món ăn
-        [HttpPost("recipe")]
-        public async Task<IActionResult> SaveRecipe([FromBody] CreateRecipeDto dto)
-        {
-            using var transaction = await _context.Database.BeginTransactionAsync();
-            try
-            {
-                var food = await _context.Foods.FindAsync(dto.IdFood);
-                if (food == null) return NotFound(new { message = "Không tìm thấy món ăn!" });
-
-                // Xóa công thức cũ
-                var oldRecipes = await _context.Recipes.Where(r => r.IdFood == dto.IdFood).ToListAsync();
-                _context.Recipes.RemoveRange(oldRecipes);
-
-                // Thêm công thức mới
-                foreach (var item in dto.Items)
-                {
-                    var recipe = new Recipe
-                    {
-                        IdFood = dto.IdFood,
-                        IdIngredient = item.IdIngredient,
-                        Amount = item.Amount
-                    };
-                    _context.Recipes.Add(recipe);
-                }
-
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                return Ok(new { message = "Cập nhật công thức thành công!" });
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync();
-                return StatusCode(500, new { message = "Lỗi khi lưu công thức!", detail = ex.Message });
-            }
-        }
+        catch (InvalidOperationException ex) { return BadRequest(ex.Message); }
+    }
+    [HttpGet("recipe")]
+    public async Task<IActionResult> GetRecipes(int? foodId) => Ok(await db.Foods.Where(f => !foodId.HasValue || f.Id == foodId).Select(f => new RecipeDto { IdFood = f.Id, FoodName = f.Name,
+        Ingredients = f.Recipes.Where(r => r.IdVariant == null).Select(r => new RecipeItemDto { IdIngredient = r.IdIngredient, IngredientName = r.Ingredient.Name, Amount = r.Amount, Unit = r.Ingredient.Unit }).ToList() }).ToListAsync());
+    [HttpPost("recipe")]
+    public async Task<IActionResult> SaveRecipe(CreateRecipeDto dto)
+    {
+        if (!await db.Foods.AnyAsync(f => f.Id == dto.IdFood)) return NotFound();
+        if (dto.Items.Any(r => !double.IsFinite(r.Amount) || r.Amount <= 0 || r.Amount > 1000000000) || dto.Items.Select(r => r.IdIngredient).Distinct().Count() != dto.Items.Count) return BadRequest("Định lượng phải dương, không lặp nguyên liệu.");
+        var ids = dto.Items.Select(r => r.IdIngredient).ToList(); if (await db.Ingredients.CountAsync(i => ids.Contains(i.Id)) != ids.Count) return BadRequest("Nguyên liệu không tồn tại.");
+        await using var tx = await db.Database.BeginTransactionAsync();
+        db.Recipes.RemoveRange(await db.Recipes.Where(r => r.IdFood == dto.IdFood && r.IdVariant == null).ToListAsync());
+        db.Recipes.AddRange(dto.Items.Select(r => new Recipe { IdFood = dto.IdFood, IdIngredient = r.IdIngredient, Amount = r.Amount }));
+        await db.SaveChangesAsync(); await tx.CommitAsync(); return Ok();
     }
 }
