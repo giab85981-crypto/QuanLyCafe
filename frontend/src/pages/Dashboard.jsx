@@ -36,7 +36,6 @@ function Dashboard() {
   const menu = data?.menu
   return <main className="dashboard">
     <div className="dashboard__title-row"><h1>Bức tranh kinh doanh</h1><div className="dashboard__actions">
-      <span className="dashboard__branch-select">Chi nhánh trung tâm</span>
       <button className="dashboard__refresh" disabled={loading} onClick={refresh}><RefreshCw size={16} /> Làm mới</button>
     </div></div>
     {error && <div className="dashboard-error" role="alert">{error}<button onClick={refresh}>Thử lại</button></div>}

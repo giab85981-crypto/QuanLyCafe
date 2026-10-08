@@ -1,0 +1,32 @@
+erDiagram
+  direction LR
+  FoodCategory {
+    int Id PK
+  }
+  ItemType {
+    int Id PK
+  }
+  Food {
+    int Id PK
+    int IdCategory FK
+  }
+  FoodVariant {
+    int Id PK
+    int IdFood FK
+  }
+  FoodTopping {
+    int IdFood PK, FK
+    int IdTopping PK, FK
+  }
+  Recipe {
+    int Id PK
+    int IdFood FK
+    int IdIngredient FK
+    int IdVariant FK
+  }
+  FoodCategory ||--o{ Food : "IdCategory"
+  Food ||--o{ FoodVariant : "IdFood"
+  Food ||--o{ FoodTopping : "IdFood"
+  Food ||--o{ FoodTopping : "IdTopping"
+  Food ||--o{ Recipe : "IdFood"
+  FoodVariant |o--o{ Recipe : "IdVariant"

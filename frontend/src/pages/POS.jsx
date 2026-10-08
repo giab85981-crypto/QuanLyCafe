@@ -214,6 +214,7 @@ function POS() {
           <button className="pos__menu-toggle" aria-label="Menu thu ngân" aria-expanded={menuOpen} onClick={() => setMenuOpen(v => !v)}><Menu size={21}/></button>
           {menuOpen && <><button className="pos__menu-dismiss" aria-label="Đóng menu thu ngân" onClick={() => setMenuOpen(false)}/><div className="pos__user-menu">
             {canOpen('/orders', user) && <button onClick={() => navigate('/orders')}>Đơn hàng</button>}
+            {canOpen('/assistant', user) && <button onClick={() => navigate('/assistant')}>Trợ lý AI</button>}
             {canOpen('/shifts', user) && <button onClick={() => navigate('/shifts')}>Ca làm việc</button>}
             {canOpen('/kitchen', user) && <button onClick={() => navigate('/kitchen')}>Bếp / Bar</button>}
             {managementLanding(user) && <button onClick={() => navigate(managementLanding(user))}>Quản lý</button>}

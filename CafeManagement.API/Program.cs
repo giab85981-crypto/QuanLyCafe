@@ -70,8 +70,12 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddControllers(options => options.Filters.Add<CafeManagement.API.Services.StaffAccessFilter>());
+builder.Services.AddScoped<CafeManagement.API.Services.AssistantInsights>();
+builder.Services.AddHttpClient<CafeManagement.API.Services.GeminiAssistant>(client => client.Timeout = TimeSpan.FromSeconds(20));
 builder.Services.AddRateLimiter(options => {
     options.RejectionStatusCode = 429;
+    options.AddPolicy("assistant", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = 6, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     options.AddPolicy("qr-submit", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
         $"{context.Connection.RemoteIpAddress}:{context.Request.RouteValues["tableId"]}", _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });

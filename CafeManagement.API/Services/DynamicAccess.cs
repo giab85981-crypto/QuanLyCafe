@@ -7,6 +7,7 @@ public record AccessRule(string Code, string Name, string Group, string? Require
 public static class DynamicAccess
 {
     public static readonly AccessRule[] Catalog = [
+        new("AI_VIEW", "Dùng trợ lý tình hình quán (theo quyền dữ liệu)", "Trợ lý AI"),
         new("DASHBOARD_VIEW", "Xem tổng quan", "Tổng quan"),
         new("POS_VIEW", "Mở bán hàng / xem đơn đang phục vụ", "Bán hàng"),
         new("POS_ORDER", "Thêm món / tạo đơn mang về / gắn khách", "Bán hàng", "POS_VIEW"),
@@ -118,6 +119,7 @@ public static class DynamicAccess
         ("Shift", "Current") => ["POS_VIEW", "SHIFT_SELF", "SHIFT_VIEW"],
         ("Shift", "List" or "Detail") => ["SHIFT_SELF", "SHIFT_VIEW"],
         ("Shift", "Open") => ["SHIFT_SELF"], ("Shift", "Close") => ["SHIFT_SELF", "SHIFT_CLOSE_OTHER"],
+        ("Assistant", "Capabilities" or "Ask") => ["AI_VIEW"],
         _ => [] // Unknown actions fail closed.
     };
 }

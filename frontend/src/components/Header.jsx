@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import HeaderNavigation from './HeaderNavigation'
 import './Header.css'
 import { canOpen, useAccess } from '../utils/staffAccess'
-import { Store, ReceiptText, ChevronDown, Bell, CircleHelp, UserRound, LogOut, ChefHat, Armchair, Coffee } from 'lucide-react'
+import { ReceiptText, ChevronDown, Bell, CircleHelp, UserRound, LogOut, ChefHat, Armchair, Coffee } from 'lucide-react'
 
 const NAV_ITEMS = [
   { label: 'Tổng quan', path: '/dashboard' },
+  { label: 'Trợ lý AI', path: '/assistant' },
   { label: 'Thực đơn', path: '/menu' },
   { label: 'Kho hàng', path: '/inventory' },
   { label: 'Phòng/Bàn', path: '/tables' },
@@ -37,8 +39,10 @@ const HELP_ITEMS = [
 function Header() {
   const navigate = useNavigate()
   const user = useAccess()
+  const availableItems = useMemo(() => NAV_ITEMS.filter(item => canOpen(item.path, user)), [user])
 
   const [openPanel, setOpenPanel] = useState(null) // 'bell' | 'help' | null
+  const closePanel = useCallback(() => setOpenPanel(null), [])
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS)
   const [helpView, setHelpView] = useState('menu') // 'menu' | 'guide' | 'shortcuts' | 'contact'
   const bellRef = useRef(null)
@@ -56,6 +60,7 @@ function Header() {
   // Đóng khi bấm ra ngoài hoặc nhấn Esc
   useEffect(() => {
     const onClick = (e) => {
+      if (e.target.closest('.app-header__nav')) return
       if ([bellRef, helpRef, screensRef, accountRef].some(ref => ref.current?.contains(e.target))) return
       setOpenPanel(null)
     }
@@ -104,23 +109,10 @@ function Header() {
         <span className="app-header__name">Quán Cà Phê</span>
       </div>
 
-      <nav className="app-header__nav">
-        {NAV_ITEMS.filter(item => canOpen(item.path, user)).map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) => `app-header__tab ${isActive ? 'is-active' : ''}`}
-            style={{ textDecoration: 'none' }}
-          >
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
+      <HeaderNavigation items={availableItems} open={openPanel === 'more'}
+        onToggle={() => toggle('more')} onClose={closePanel}/>
 
       <div className="app-header__actions">
-        <span className="header-branch" title="Quán hiện sử dụng Chi nhánh trung tâm">
-          <Store size={17}/><span>Chi nhánh trung tâm</span>
-        </span>
         {canOpen('/pos', user) && <div className="header-pop" ref={screensRef}>
           <div className="header-sales">
             <button className="header-sales__main" onClick={() => { setOpenPanel(null); navigate('/pos') }} title="Mở màn hình bán hàng"><ReceiptText size={17}/><span>Thu ngân</span></button>

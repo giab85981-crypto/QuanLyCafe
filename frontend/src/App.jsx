@@ -18,6 +18,7 @@ import Permissions from './pages/Permissions';
 import Shifts from './pages/Shifts';
 import AccessSync from './components/AccessSync';
 import ThemeToggle from './components/ThemeToggle';
+import Assistant from './pages/Assistant';
 import { canOpen, landing, useAccess } from './utils/staffAccess';
 import { useLocation } from 'react-router-dom';
 
@@ -57,6 +58,7 @@ function App() {
           }
         >
           <Route path="/reports" element={<Reports />} />
+          <Route path="/assistant" element={<Assistant />} />
           <Route path="/shifts" element={<Shifts />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/menu" element={<Menu />} />

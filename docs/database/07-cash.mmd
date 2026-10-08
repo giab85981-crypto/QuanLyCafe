@@ -1,0 +1,13 @@
+erDiagram
+  direction LR
+  CashierShift {
+    int Id PK
+    nvarchar UserName FK
+  }
+  CashEntry {
+    int Id PK
+    int IdBill FK
+    int IdImportReceipt FK
+    int IdShift FK
+  }
+  CashierShift |o--o{ CashEntry : "IdShift"

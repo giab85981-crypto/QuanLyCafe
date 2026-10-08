@@ -1,0 +1,2790 @@
+{
+  "source": "CafeManagement.API/Migrations/AppDbContextModelSnapshot.cs",
+  "tableCount": 37,
+  "foreignKeyCount": 50,
+  "groups": [
+    {
+      "id": "01-access",
+      "title": "Tài khoản, phân quyền và nhân viên",
+      "note": "Giải thích phân quyền động: quyền theo nhóm và quyền riêng của tài khoản.",
+      "names": [
+        "Role",
+        "Account",
+        "Permission",
+        "RolePermission",
+        "AccountPermission",
+        "AccessAudit",
+        "Employee",
+        "EmployeeActivity"
+      ],
+      "code": "erDiagram\n  direction LR\n  Role {\n    int Id PK\n  }\n  Account {\n    nvarchar UserName PK\n    int IdRole FK\n  }\n  Permission {\n    int Id PK\n  }\n  RolePermission {\n    int IdRole PK, FK\n    int IdPermission PK, FK\n  }\n  AccountPermission {\n    nvarchar UserName PK, FK\n    int IdPermission PK, FK\n  }\n  AccessAudit {\n    int Id PK\n  }\n  Employee {\n    int Id PK\n    nvarchar UserName FK\n  }\n  EmployeeActivity {\n    int Id PK\n    int EmployeeId FK\n  }\n  Role ||--o{ Account : \"IdRole\"\n  Permission ||--o{ RolePermission : \"IdPermission\"\n  Role ||--o{ RolePermission : \"IdRole\"\n  Permission ||--o{ AccountPermission : \"IdPermission\"\n  Account ||--o{ AccountPermission : \"UserName\"\n  Account |o--o| Employee : \"UserName\"\n  Employee ||--o{ EmployeeActivity : \"EmployeeId\"",
+      "external": []
+    },
+    {
+      "id": "02-menu",
+      "title": "Thực đơn và định lượng",
+      "note": "Món, biến thể, topping và công thức nguyên liệu.",
+      "names": [
+        "FoodCategory",
+        "ItemType",
+        "Food",
+        "FoodVariant",
+        "FoodTopping",
+        "Recipe"
+      ],
+      "code": "erDiagram\n  direction LR\n  FoodCategory {\n    int Id PK\n  }\n  ItemType {\n    int Id PK\n  }\n  Food {\n    int Id PK\n    int IdCategory FK\n  }\n  FoodVariant {\n    int Id PK\n    int IdFood FK\n  }\n  FoodTopping {\n    int IdFood PK, FK\n    int IdTopping PK, FK\n  }\n  Recipe {\n    int Id PK\n    int IdFood FK\n    int IdIngredient FK\n    int IdVariant FK\n  }\n  FoodCategory ||--o{ Food : \"IdCategory\"\n  Food ||--o{ FoodVariant : \"IdFood\"\n  Food ||--o{ FoodTopping : \"IdFood\"\n  Food ||--o{ FoodTopping : \"IdTopping\"\n  Food ||--o{ Recipe : \"IdFood\"\n  FoodVariant |o--o{ Recipe : \"IdVariant\"",
+      "external": [
+        {
+          "child": "Recipe",
+          "parent": "Ingredient",
+          "columns": [
+            "IdIngredient"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "id": "03-stock",
+      "title": "Nguyên liệu và tồn kho",
+      "note": "Đơn vị quy đổi, lô hàng, hạn dùng và lịch sử biến động kho.",
+      "names": [
+        "IngredientGroup",
+        "Ingredient",
+        "IngredientUnit",
+        "StockLot",
+        "StockMovement"
+      ],
+      "code": "erDiagram\n  direction LR\n  IngredientGroup {\n    int Id PK\n  }\n  Ingredient {\n    int Id PK\n    int IdGroup FK\n  }\n  IngredientUnit {\n    int Id PK\n    int IdIngredient FK\n  }\n  StockLot {\n    int Id PK\n    int IdImportReceipt FK\n    int IdIngredient FK\n  }\n  StockMovement {\n    int Id PK\n    int IdDocument FK\n    int IdImportReceipt FK\n    int IdIngredient FK\n    int IdKitchenDetail FK\n    int IdLot FK\n  }\n  IngredientGroup |o--o{ Ingredient : \"IdGroup\"\n  Ingredient ||--o{ IngredientUnit : \"IdIngredient\"\n  Ingredient ||--o{ StockLot : \"IdIngredient\"\n  Ingredient ||--o{ StockMovement : \"IdIngredient\"\n  StockLot |o--o{ StockMovement : \"IdLot\"",
+      "external": [
+        {
+          "child": "StockLot",
+          "parent": "ImportReceipt",
+          "columns": [
+            "IdImportReceipt"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "child": "StockMovement",
+          "parent": "WarehouseDocument",
+          "columns": [
+            "IdDocument"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "child": "StockMovement",
+          "parent": "ImportReceipt",
+          "columns": [
+            "IdImportReceipt"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "child": "StockMovement",
+          "parent": "KitchenOrderDetail",
+          "columns": [
+            "IdKitchenDetail"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "id": "04-warehouse",
+      "title": "Nhà cung cấp và chứng từ kho",
+      "note": "Phiếu nhập, chi tiết nhập và chứng từ xuất / kiểm kê / hủy.",
+      "names": [
+        "Supplier",
+        "ImportReceipt",
+        "ImportDetail",
+        "WarehouseDocument",
+        "WarehouseDocumentLine"
+      ],
+      "code": "erDiagram\n  direction LR\n  Supplier {\n    int Id PK\n  }\n  ImportReceipt {\n    int Id PK\n    int IdSupplier FK\n    nvarchar UserName FK\n  }\n  ImportDetail {\n    int Id PK\n    int IdImportReceipt FK\n    int IdIngredient FK\n    int IdLot FK\n  }\n  WarehouseDocument {\n    int Id PK\n  }\n  WarehouseDocumentLine {\n    int Id PK\n    int IdDocument FK\n    int IdIngredient FK\n  }\n  Supplier ||--o{ ImportReceipt : \"IdSupplier\"\n  ImportReceipt ||--o{ ImportDetail : \"IdImportReceipt\"\n  WarehouseDocument ||--o{ WarehouseDocumentLine : \"IdDocument\"",
+      "external": [
+        {
+          "child": "ImportReceipt",
+          "parent": "Account",
+          "columns": [
+            "UserName"
+          ],
+          "required": true,
+          "parentColumns": [
+            "UserName"
+          ],
+          "unique": false
+        },
+        {
+          "child": "ImportDetail",
+          "parent": "Ingredient",
+          "columns": [
+            "IdIngredient"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "child": "ImportDetail",
+          "parent": "StockLot",
+          "columns": [
+            "IdLot"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "child": "WarehouseDocumentLine",
+          "parent": "Ingredient",
+          "columns": [
+            "IdIngredient"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "id": "05-sales",
+      "title": "Phòng bàn, đơn hàng và bếp",
+      "note": "Từ khu vực / bàn đến hóa đơn, báo bếp và yêu cầu gọi món bằng QR.",
+      "names": [
+        "Area",
+        "TableFood",
+        "TableOperation",
+        "Bill",
+        "BillInfo",
+        "KitchenOrder",
+        "KitchenOrderDetail",
+        "QrOrderRequest"
+      ],
+      "code": "erDiagram\n  direction LR\n  Area {\n    int Id PK\n  }\n  TableFood {\n    int Id PK\n    int IdArea FK\n  }\n  TableOperation {\n    int Id PK\n  }\n  Bill {\n    int Id PK\n    int IdCustomer FK\n    int IdShift FK\n    int IdTable FK\n  }\n  BillInfo {\n    int Id PK\n    int IdBill FK\n    int IdFood FK\n    int IdVariant FK\n  }\n  KitchenOrder {\n    int Id PK\n    int IdBill FK\n  }\n  KitchenOrderDetail {\n    int Id PK\n    int IdBillInfo FK\n    int IdFood FK\n    int IdKitchenOrder FK\n  }\n  QrOrderRequest {\n    int Id PK\n    int IdBill FK\n    int IdTable FK\n  }\n  Area |o--o{ TableFood : \"IdArea\"\n  TableFood |o--o{ Bill : \"IdTable\"\n  Bill ||--o{ BillInfo : \"IdBill\"\n  Bill ||--o{ KitchenOrder : \"IdBill\"\n  BillInfo |o--o{ KitchenOrderDetail : \"IdBillInfo\"\n  KitchenOrder ||--o{ KitchenOrderDetail : \"IdKitchenOrder\"\n  Bill |o--o{ QrOrderRequest : \"IdBill\"\n  TableFood ||--o{ QrOrderRequest : \"IdTable\"",
+      "external": [
+        {
+          "child": "Bill",
+          "parent": "Customer",
+          "columns": [
+            "IdCustomer"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "child": "Bill",
+          "parent": "CashierShift",
+          "columns": [
+            "IdShift"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "child": "BillInfo",
+          "parent": "Food",
+          "columns": [
+            "IdFood"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "child": "BillInfo",
+          "parent": "FoodVariant",
+          "columns": [
+            "IdVariant"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "child": "KitchenOrderDetail",
+          "parent": "Food",
+          "columns": [
+            "IdFood"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "id": "06-customers",
+      "title": "Khách hàng và tích điểm",
+      "note": "Nhóm khách hàng, hồ sơ khách hàng và lịch sử điểm.",
+      "names": [
+        "CustomerGroup",
+        "Customer",
+        "CustomerPointEntry"
+      ],
+      "code": "erDiagram\n  direction LR\n  CustomerGroup {\n    int Id PK\n  }\n  Customer {\n    int Id PK\n    int IdGroup FK\n  }\n  CustomerPointEntry {\n    int Id PK\n    int IdBill FK\n    int IdCustomer FK\n  }\n  CustomerGroup |o--o{ Customer : \"IdGroup\"\n  Customer ||--o{ CustomerPointEntry : \"IdCustomer\"",
+      "external": [
+        {
+          "child": "CustomerPointEntry",
+          "parent": "Bill",
+          "columns": [
+            "IdBill"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "id": "07-cash",
+      "title": "Sổ quỹ và ca thu ngân",
+      "note": "Dòng tiền gắn với hóa đơn, nhập hàng và ca thu ngân.",
+      "names": [
+        "CashierShift",
+        "CashEntry"
+      ],
+      "code": "erDiagram\n  direction LR\n  CashierShift {\n    int Id PK\n    nvarchar UserName FK\n  }\n  CashEntry {\n    int Id PK\n    int IdBill FK\n    int IdImportReceipt FK\n    int IdShift FK\n  }\n  CashierShift |o--o{ CashEntry : \"IdShift\"",
+      "external": [
+        {
+          "child": "CashierShift",
+          "parent": "Account",
+          "columns": [
+            "UserName"
+          ],
+          "required": true,
+          "parentColumns": [
+            "UserName"
+          ],
+          "unique": true
+        },
+        {
+          "child": "CashEntry",
+          "parent": "Bill",
+          "columns": [
+            "IdBill"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "child": "CashEntry",
+          "parent": "ImportReceipt",
+          "columns": [
+            "IdImportReceipt"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "name": "AccessAudit",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Actor",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "Changes",
+          "type": "nvarchar(max)",
+          "nullable": false
+        },
+        {
+          "name": "CreatedAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "Target",
+          "type": "nvarchar(100)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [],
+      "uniqueKeys": []
+    },
+    {
+      "name": "Account",
+      "columns": [
+        {
+          "name": "UserName",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "DisplayName",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "IdRole",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IsActive",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "PassWord",
+          "type": "nvarchar(255)",
+          "nullable": false
+        },
+        {
+          "name": "SecurityVersion",
+          "type": "int",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "UserName"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Role",
+          "columns": [
+            "IdRole"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "AccountPermission",
+      "columns": [
+        {
+          "name": "UserName",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "IdPermission",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Allowed",
+          "type": "bit",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "UserName",
+        "IdPermission"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Permission",
+          "columns": [
+            "IdPermission"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "Account",
+          "columns": [
+            "UserName"
+          ],
+          "required": true,
+          "parentColumns": [
+            "UserName"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "Area",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IsActive",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(100)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [],
+      "uniqueKeys": []
+    },
+    {
+      "name": "Bill",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "CancellationReason",
+          "type": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "CancelledAt",
+          "type": "datetime2",
+          "nullable": true
+        },
+        {
+          "name": "CancelledBy",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "CreatedBy",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "CreationKey",
+          "type": "nvarchar(64)",
+          "nullable": false
+        },
+        {
+          "name": "CustomerNameSnapshot",
+          "type": "nvarchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "CustomerPhoneSnapshot",
+          "type": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "DateCheckIn",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "DateCheckOut",
+          "type": "datetime2",
+          "nullable": true
+        },
+        {
+          "name": "Discount",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "GuestCount",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "HasRecordedPayment",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "IdCustomer",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IdShift",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IdTable",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "Note",
+          "type": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "OrderType",
+          "type": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "PaidBy",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "PaymentMethod",
+          "type": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "PointDiscount",
+          "type": "decimal(18,2)",
+          "nullable": false
+        },
+        {
+          "name": "PointsEarned",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "PointsRedeemed",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "RefundAmount",
+          "type": "decimal(18,2)",
+          "nullable": false
+        },
+        {
+          "name": "RefundMethod",
+          "type": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "Status",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "TableNameSnapshot",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "TotalPrice",
+          "type": "decimal(18,2)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Customer",
+          "columns": [
+            "IdCustomer"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "CashierShift",
+          "columns": [
+            "IdShift"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "TableFood",
+          "columns": [
+            "IdTable"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "CreationKey"
+        ]
+      ]
+    },
+    {
+      "name": "BillInfo",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "CostPrice",
+          "type": "float",
+          "nullable": false
+        },
+        {
+          "name": "Count",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "FoodNameSnapshot",
+          "type": "nvarchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "IdBill",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdFood",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdVariant",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IngredientsJson",
+          "type": "nvarchar(max)",
+          "nullable": false
+        },
+        {
+          "name": "OptionLabel",
+          "type": "nvarchar(max)",
+          "nullable": false
+        },
+        {
+          "name": "OptionsJson",
+          "type": "nvarchar(max)",
+          "nullable": false
+        },
+        {
+          "name": "SentCount",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "UnitPrice",
+          "type": "decimal(18,2)",
+          "nullable": true
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Bill",
+          "columns": [
+            "IdBill"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "Food",
+          "columns": [
+            "IdFood"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "FoodVariant",
+          "columns": [
+            "IdVariant"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "CashEntry",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Amount",
+          "type": "decimal(18,2)",
+          "nullable": false
+        },
+        {
+          "name": "Category",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "CreatedAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "CreatedBy",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "Direction",
+          "type": "nvarchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "IdBill",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IdImportReceipt",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IdShift",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "Note",
+          "type": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "PaymentMethod",
+          "type": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "RequestKey",
+          "type": "nvarchar(64)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Bill",
+          "columns": [
+            "IdBill"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "ImportReceipt",
+          "columns": [
+            "IdImportReceipt"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "CashierShift",
+          "columns": [
+            "IdShift"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "RequestKey"
+        ],
+        [
+          "IdBill",
+          "Direction"
+        ]
+      ]
+    },
+    {
+      "name": "CashierShift",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "ClosedAt",
+          "type": "datetime2",
+          "nullable": true
+        },
+        {
+          "name": "ClosedBy",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "ClosingNote",
+          "type": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "ClosingSummaryJson",
+          "type": "nvarchar(max)",
+          "nullable": false
+        },
+        {
+          "name": "CountedCash",
+          "type": "decimal(18,2)",
+          "nullable": true
+        },
+        {
+          "name": "Difference",
+          "type": "decimal(18,2)",
+          "nullable": true
+        },
+        {
+          "name": "ExpectedCash",
+          "type": "decimal(18,2)",
+          "nullable": true
+        },
+        {
+          "name": "OpenedAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "OpeningCash",
+          "type": "decimal(18,2)",
+          "nullable": false
+        },
+        {
+          "name": "OpeningNote",
+          "type": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "RequestKey",
+          "type": "nvarchar(64)",
+          "nullable": false
+        },
+        {
+          "name": "UserName",
+          "type": "nvarchar(100)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Account",
+          "columns": [
+            "UserName"
+          ],
+          "required": true,
+          "parentColumns": [
+            "UserName"
+          ],
+          "unique": true
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "RequestKey"
+        ],
+        [
+          "UserName"
+        ]
+      ]
+    },
+    {
+      "name": "Customer",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Address",
+          "type": "nvarchar(300)",
+          "nullable": false
+        },
+        {
+          "name": "Birthday",
+          "type": "datetime2",
+          "nullable": true
+        },
+        {
+          "name": "Code",
+          "type": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "CreatedAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "Email",
+          "type": "nvarchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "Gender",
+          "type": "nvarchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "IdGroup",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IsActive",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "Note",
+          "type": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "Phone",
+          "type": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "Points",
+          "type": "int",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "CustomerGroup",
+          "columns": [
+            "IdGroup"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "Code"
+        ],
+        [
+          "Phone"
+        ]
+      ]
+    },
+    {
+      "name": "CustomerGroup",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(100)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [],
+      "uniqueKeys": [
+        [
+          "Name"
+        ]
+      ]
+    },
+    {
+      "name": "CustomerPointEntry",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Balance",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "CreatedAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "CreatedBy",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "Delta",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdBill",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdCustomer",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Kind",
+          "type": "nvarchar(20)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Bill",
+          "columns": [
+            "IdBill"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "Customer",
+          "columns": [
+            "IdCustomer"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "IdBill",
+          "Kind"
+        ]
+      ]
+    },
+    {
+      "name": "Employee",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Address",
+          "type": "nvarchar(255)",
+          "nullable": false
+        },
+        {
+          "name": "Birthday",
+          "type": "datetime2",
+          "nullable": true
+        },
+        {
+          "name": "Department",
+          "type": "nvarchar(80)",
+          "nullable": false
+        },
+        {
+          "name": "Email",
+          "type": "nvarchar(120)",
+          "nullable": false
+        },
+        {
+          "name": "Gender",
+          "type": "nvarchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "HireDate",
+          "type": "datetime2",
+          "nullable": true
+        },
+        {
+          "name": "IsActive",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "Note",
+          "type": "nvarchar(1000)",
+          "nullable": false
+        },
+        {
+          "name": "Phone",
+          "type": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "Position",
+          "type": "nvarchar(80)",
+          "nullable": false
+        },
+        {
+          "name": "UserName",
+          "type": "nvarchar(100)",
+          "nullable": true
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Account",
+          "columns": [
+            "UserName"
+          ],
+          "required": false,
+          "parentColumns": [
+            "UserName"
+          ],
+          "unique": true
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "UserName"
+        ]
+      ]
+    },
+    {
+      "name": "EmployeeActivity",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Action",
+          "type": "nvarchar(255)",
+          "nullable": false
+        },
+        {
+          "name": "Actor",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "CreatedAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "EmployeeId",
+          "type": "int",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Employee",
+          "columns": [
+            "EmployeeId"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "Food",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Code",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "CostPrice",
+          "type": "float",
+          "nullable": false
+        },
+        {
+          "name": "Description",
+          "type": "nvarchar(1000)",
+          "nullable": false
+        },
+        {
+          "name": "IdCategory",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "ImageUrl",
+          "type": "nvarchar(max)",
+          "nullable": true
+        },
+        {
+          "name": "IsActive",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "IsFavorite",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "IsTopping",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "ItemType",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "MenuKind",
+          "type": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "Price",
+          "type": "decimal(18,2)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "FoodCategory",
+          "columns": [
+            "IdCategory"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "Code"
+        ]
+      ]
+    },
+    {
+      "name": "FoodCategory",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(150)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [],
+      "uniqueKeys": []
+    },
+    {
+      "name": "FoodTopping",
+      "columns": [
+        {
+          "name": "IdFood",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdTopping",
+          "type": "int",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "IdFood",
+        "IdTopping"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Food",
+          "columns": [
+            "IdFood"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "Food",
+          "columns": [
+            "IdTopping"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "FoodVariant",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "CostPrice",
+          "type": "float",
+          "nullable": false
+        },
+        {
+          "name": "IdFood",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IsActive",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(50)",
+          "nullable": false
+        },
+        {
+          "name": "Price",
+          "type": "decimal(18,2)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Food",
+          "columns": [
+            "IdFood"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "ImportDetail",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "ConversionFactor",
+          "type": "decimal(18,6)",
+          "nullable": false
+        },
+        {
+          "name": "Count",
+          "type": "float",
+          "nullable": false
+        },
+        {
+          "name": "IdImportReceipt",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdIngredient",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdLot",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "InputQuantity",
+          "type": "float",
+          "nullable": true
+        },
+        {
+          "name": "InputUnitPrice",
+          "type": "decimal(18,2)",
+          "nullable": true
+        },
+        {
+          "name": "UnitName",
+          "type": "nvarchar(30)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "ImportReceipt",
+          "columns": [
+            "IdImportReceipt"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "Ingredient",
+          "columns": [
+            "IdIngredient"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "StockLot",
+          "columns": [
+            "IdLot"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "ImportReceipt",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "HasPaymentTracking",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "IdSupplier",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "ImportDate",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "Note",
+          "type": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "RequestKey",
+          "type": "nvarchar(64)",
+          "nullable": false
+        },
+        {
+          "name": "TotalAmount",
+          "type": "decimal(18,2)",
+          "nullable": false
+        },
+        {
+          "name": "UserName",
+          "type": "nvarchar(100)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Supplier",
+          "columns": [
+            "IdSupplier"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "Account",
+          "columns": [
+            "UserName"
+          ],
+          "required": true,
+          "parentColumns": [
+            "UserName"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "RequestKey"
+        ]
+      ]
+    },
+    {
+      "name": "Ingredient",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Code",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "IdGroup",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IsActive",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "MinQuantity",
+          "type": "float",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "Quantity",
+          "type": "float",
+          "nullable": false
+        },
+        {
+          "name": "Unit",
+          "type": "nvarchar(50)",
+          "nullable": false
+        },
+        {
+          "name": "UnitCost",
+          "type": "decimal(18,4)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "IngredientGroup",
+          "columns": [
+            "IdGroup"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "Code"
+        ]
+      ]
+    },
+    {
+      "name": "IngredientGroup",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(100)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [],
+      "uniqueKeys": [
+        [
+          "Name"
+        ]
+      ]
+    },
+    {
+      "name": "IngredientUnit",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Factor",
+          "type": "decimal(18,6)",
+          "nullable": false
+        },
+        {
+          "name": "IdIngredient",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(30)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Ingredient",
+          "columns": [
+            "IdIngredient"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "IdIngredient",
+          "Name"
+        ]
+      ]
+    },
+    {
+      "name": "ItemType",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(100)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [],
+      "uniqueKeys": [
+        [
+          "Name"
+        ]
+      ]
+    },
+    {
+      "name": "KitchenOrder",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "CreatedAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "IdBill",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Status",
+          "type": "nvarchar(max)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Bill",
+          "columns": [
+            "IdBill"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "KitchenOrderDetail",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "CancellationNote",
+          "type": "nvarchar(300)",
+          "nullable": false
+        },
+        {
+          "name": "CancelledCount",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Count",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdBillInfo",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IdFood",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdKitchenOrder",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "OptionLabel",
+          "type": "nvarchar(max)",
+          "nullable": false
+        },
+        {
+          "name": "Status",
+          "type": "nvarchar(max)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "BillInfo",
+          "columns": [
+            "IdBillInfo"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "Food",
+          "columns": [
+            "IdFood"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "KitchenOrder",
+          "columns": [
+            "IdKitchenOrder"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "Permission",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Code",
+          "type": "nvarchar(50)",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(100)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [],
+      "uniqueKeys": []
+    },
+    {
+      "name": "QrOrderRequest",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "CreatedAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "DecidedAt",
+          "type": "datetime2",
+          "nullable": true
+        },
+        {
+          "name": "DecidedBy",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "ExpiresAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "IdBill",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IdTable",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "ItemsJson",
+          "type": "nvarchar(max)",
+          "nullable": false
+        },
+        {
+          "name": "Note",
+          "type": "nvarchar(300)",
+          "nullable": false
+        },
+        {
+          "name": "Reason",
+          "type": "nvarchar(300)",
+          "nullable": false
+        },
+        {
+          "name": "RequestKey",
+          "type": "nvarchar(36)",
+          "nullable": false
+        },
+        {
+          "name": "Status",
+          "type": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "TableName",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "Total",
+          "type": "decimal(18,2)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Bill",
+          "columns": [
+            "IdBill"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "TableFood",
+          "columns": [
+            "IdTable"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "RequestKey"
+        ]
+      ]
+    },
+    {
+      "name": "Recipe",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Amount",
+          "type": "float",
+          "nullable": false
+        },
+        {
+          "name": "IdFood",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdIngredient",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdVariant",
+          "type": "int",
+          "nullable": true
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Food",
+          "columns": [
+            "IdFood"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "Ingredient",
+          "columns": [
+            "IdIngredient"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "FoodVariant",
+          "columns": [
+            "IdVariant"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "Role",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "AccessConfigured",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "Description",
+          "type": "nvarchar(255)",
+          "nullable": true
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(50)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [],
+      "uniqueKeys": []
+    },
+    {
+      "name": "RolePermission",
+      "columns": [
+        {
+          "name": "IdRole",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdPermission",
+          "type": "int",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "IdRole",
+        "IdPermission"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Permission",
+          "columns": [
+            "IdPermission"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "Role",
+          "columns": [
+            "IdRole"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "StockLot",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Code",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "CreatedAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "ExpiryDate",
+          "type": "datetime2",
+          "nullable": true
+        },
+        {
+          "name": "IdImportReceipt",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IdIngredient",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Quantity",
+          "type": "float",
+          "nullable": false
+        },
+        {
+          "name": "UnitCost",
+          "type": "decimal(18,4)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "ImportReceipt",
+          "columns": [
+            "IdImportReceipt"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "Ingredient",
+          "columns": [
+            "IdIngredient"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "StockMovement",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "CreatedAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "CreatedBy",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "IdDocument",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IdImportReceipt",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IdIngredient",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdKitchenDetail",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IdLot",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "Kind",
+          "type": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "Note",
+          "type": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "Quantity",
+          "type": "float",
+          "nullable": false
+        },
+        {
+          "name": "UnitCost",
+          "type": "decimal(18,4)",
+          "nullable": true
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "WarehouseDocument",
+          "columns": [
+            "IdDocument"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "ImportReceipt",
+          "columns": [
+            "IdImportReceipt"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "Ingredient",
+          "columns": [
+            "IdIngredient"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "KitchenOrderDetail",
+          "columns": [
+            "IdKitchenDetail"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "StockLot",
+          "columns": [
+            "IdLot"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "Supplier",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Address",
+          "type": "nvarchar(max)",
+          "nullable": true
+        },
+        {
+          "name": "IsActive",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "Phone",
+          "type": "nvarchar(20)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [],
+      "uniqueKeys": []
+    },
+    {
+      "name": "TableFood",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdArea",
+          "type": "int",
+          "nullable": true
+        },
+        {
+          "name": "IsActive",
+          "type": "bit",
+          "nullable": false
+        },
+        {
+          "name": "Name",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "Note",
+          "type": "nvarchar(255)",
+          "nullable": true
+        },
+        {
+          "name": "Seats",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "SortOrder",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "Status",
+          "type": "nvarchar(50)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "Area",
+          "columns": [
+            "IdArea"
+          ],
+          "required": false,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    },
+    {
+      "name": "TableOperation",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "CreatedAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "CreatedBy",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "ItemsJson",
+          "type": "nvarchar(max)",
+          "nullable": false
+        },
+        {
+          "name": "Kind",
+          "type": "nvarchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "Note",
+          "type": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "RequestKey",
+          "type": "nvarchar(64)",
+          "nullable": false
+        },
+        {
+          "name": "SourceBillId",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "SourceName",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "SourceTableId",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "TargetBillId",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "TargetName",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "TargetTableId",
+          "type": "int",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [],
+      "uniqueKeys": [
+        [
+          "RequestKey"
+        ]
+      ]
+    },
+    {
+      "name": "WarehouseDocument",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "CreatedAt",
+          "type": "datetime2",
+          "nullable": false
+        },
+        {
+          "name": "CreatedBy",
+          "type": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "Kind",
+          "type": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "Note",
+          "type": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "RequestKey",
+          "type": "nvarchar(64)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [],
+      "uniqueKeys": [
+        [
+          "RequestKey"
+        ]
+      ]
+    },
+    {
+      "name": "WarehouseDocumentLine",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "AfterQuantity",
+          "type": "float",
+          "nullable": false
+        },
+        {
+          "name": "BeforeQuantity",
+          "type": "float",
+          "nullable": false
+        },
+        {
+          "name": "IdDocument",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "IdIngredient",
+          "type": "int",
+          "nullable": false
+        },
+        {
+          "name": "UnitCost",
+          "type": "decimal(18,4)",
+          "nullable": false
+        }
+      ],
+      "primaryKey": [
+        "Id"
+      ],
+      "foreignKeys": [
+        {
+          "parent": "WarehouseDocument",
+          "columns": [
+            "IdDocument"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        },
+        {
+          "parent": "Ingredient",
+          "columns": [
+            "IdIngredient"
+          ],
+          "required": true,
+          "parentColumns": [
+            "Id"
+          ],
+          "unique": false
+        }
+      ],
+      "uniqueKeys": []
+    }
+  ],
+  "owner": {
+    "Role": "01-access",
+    "Account": "01-access",
+    "Permission": "01-access",
+    "RolePermission": "01-access",
+    "AccountPermission": "01-access",
+    "AccessAudit": "01-access",
+    "Employee": "01-access",
+    "EmployeeActivity": "01-access",
+    "FoodCategory": "02-menu",
+    "ItemType": "02-menu",
+    "Food": "02-menu",
+    "FoodVariant": "02-menu",
+    "FoodTopping": "02-menu",
+    "Recipe": "02-menu",
+    "IngredientGroup": "03-stock",
+    "Ingredient": "03-stock",
+    "IngredientUnit": "03-stock",
+    "StockLot": "03-stock",
+    "StockMovement": "03-stock",
+    "Supplier": "04-warehouse",
+    "ImportReceipt": "04-warehouse",
+    "ImportDetail": "04-warehouse",
+    "WarehouseDocument": "04-warehouse",
+    "WarehouseDocumentLine": "04-warehouse",
+    "Area": "05-sales",
+    "TableFood": "05-sales",
+    "TableOperation": "05-sales",
+    "Bill": "05-sales",
+    "BillInfo": "05-sales",
+    "KitchenOrder": "05-sales",
+    "KitchenOrderDetail": "05-sales",
+    "QrOrderRequest": "05-sales",
+    "CustomerGroup": "06-customers",
+    "Customer": "06-customers",
+    "CustomerPointEntry": "06-customers",
+    "CashierShift": "07-cash",
+    "CashEntry": "07-cash"
+  }
+}

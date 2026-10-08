@@ -1,0 +1,47 @@
+erDiagram
+  direction LR
+  Area {
+    int Id PK
+  }
+  TableFood {
+    int Id PK
+    int IdArea FK
+  }
+  TableOperation {
+    int Id PK
+  }
+  Bill {
+    int Id PK
+    int IdCustomer FK
+    int IdShift FK
+    int IdTable FK
+  }
+  BillInfo {
+    int Id PK
+    int IdBill FK
+    int IdFood FK
+    int IdVariant FK
+  }
+  KitchenOrder {
+    int Id PK
+    int IdBill FK
+  }
+  KitchenOrderDetail {
+    int Id PK
+    int IdBillInfo FK
+    int IdFood FK
+    int IdKitchenOrder FK
+  }
+  QrOrderRequest {
+    int Id PK
+    int IdBill FK
+    int IdTable FK
+  }
+  Area |o--o{ TableFood : "IdArea"
+  TableFood |o--o{ Bill : "IdTable"
+  Bill ||--o{ BillInfo : "IdBill"
+  Bill ||--o{ KitchenOrder : "IdBill"
+  BillInfo |o--o{ KitchenOrderDetail : "IdBillInfo"
+  KitchenOrder ||--o{ KitchenOrderDetail : "IdKitchenOrder"
+  Bill |o--o{ QrOrderRequest : "IdBill"
+  TableFood ||--o{ QrOrderRequest : "IdTable"

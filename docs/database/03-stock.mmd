@@ -1,0 +1,31 @@
+erDiagram
+  direction LR
+  IngredientGroup {
+    int Id PK
+  }
+  Ingredient {
+    int Id PK
+    int IdGroup FK
+  }
+  IngredientUnit {
+    int Id PK
+    int IdIngredient FK
+  }
+  StockLot {
+    int Id PK
+    int IdImportReceipt FK
+    int IdIngredient FK
+  }
+  StockMovement {
+    int Id PK
+    int IdDocument FK
+    int IdImportReceipt FK
+    int IdIngredient FK
+    int IdKitchenDetail FK
+    int IdLot FK
+  }
+  IngredientGroup |o--o{ Ingredient : "IdGroup"
+  Ingredient ||--o{ IngredientUnit : "IdIngredient"
+  Ingredient ||--o{ StockLot : "IdIngredient"
+  Ingredient ||--o{ StockMovement : "IdIngredient"
+  StockLot |o--o{ StockMovement : "IdLot"

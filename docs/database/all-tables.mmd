@@ -1,0 +1,210 @@
+erDiagram
+  direction LR
+  Role {
+    int Id PK
+  }
+  Account {
+    nvarchar UserName PK
+    int IdRole FK
+  }
+  Permission {
+    int Id PK
+  }
+  RolePermission {
+    int IdRole PK, FK
+    int IdPermission PK, FK
+  }
+  AccountPermission {
+    nvarchar UserName PK, FK
+    int IdPermission PK, FK
+  }
+  AccessAudit {
+    int Id PK
+  }
+  Employee {
+    int Id PK
+    nvarchar UserName FK
+  }
+  EmployeeActivity {
+    int Id PK
+    int EmployeeId FK
+  }
+  FoodCategory {
+    int Id PK
+  }
+  ItemType {
+    int Id PK
+  }
+  Food {
+    int Id PK
+    int IdCategory FK
+  }
+  FoodVariant {
+    int Id PK
+    int IdFood FK
+  }
+  FoodTopping {
+    int IdFood PK, FK
+    int IdTopping PK, FK
+  }
+  Recipe {
+    int Id PK
+    int IdFood FK
+    int IdIngredient FK
+    int IdVariant FK
+  }
+  IngredientGroup {
+    int Id PK
+  }
+  Ingredient {
+    int Id PK
+    int IdGroup FK
+  }
+  IngredientUnit {
+    int Id PK
+    int IdIngredient FK
+  }
+  StockLot {
+    int Id PK
+    int IdImportReceipt FK
+    int IdIngredient FK
+  }
+  StockMovement {
+    int Id PK
+    int IdDocument FK
+    int IdImportReceipt FK
+    int IdIngredient FK
+    int IdKitchenDetail FK
+    int IdLot FK
+  }
+  Supplier {
+    int Id PK
+  }
+  ImportReceipt {
+    int Id PK
+    int IdSupplier FK
+    nvarchar UserName FK
+  }
+  ImportDetail {
+    int Id PK
+    int IdImportReceipt FK
+    int IdIngredient FK
+    int IdLot FK
+  }
+  WarehouseDocument {
+    int Id PK
+  }
+  WarehouseDocumentLine {
+    int Id PK
+    int IdDocument FK
+    int IdIngredient FK
+  }
+  Area {
+    int Id PK
+  }
+  TableFood {
+    int Id PK
+    int IdArea FK
+  }
+  TableOperation {
+    int Id PK
+  }
+  Bill {
+    int Id PK
+    int IdCustomer FK
+    int IdShift FK
+    int IdTable FK
+  }
+  BillInfo {
+    int Id PK
+    int IdBill FK
+    int IdFood FK
+    int IdVariant FK
+  }
+  KitchenOrder {
+    int Id PK
+    int IdBill FK
+  }
+  KitchenOrderDetail {
+    int Id PK
+    int IdBillInfo FK
+    int IdFood FK
+    int IdKitchenOrder FK
+  }
+  QrOrderRequest {
+    int Id PK
+    int IdBill FK
+    int IdTable FK
+  }
+  CustomerGroup {
+    int Id PK
+  }
+  Customer {
+    int Id PK
+    int IdGroup FK
+  }
+  CustomerPointEntry {
+    int Id PK
+    int IdBill FK
+    int IdCustomer FK
+  }
+  CashierShift {
+    int Id PK
+    nvarchar UserName FK
+  }
+  CashEntry {
+    int Id PK
+    int IdBill FK
+    int IdImportReceipt FK
+    int IdShift FK
+  }
+  Role ||--o{ Account : "IdRole"
+  Permission ||--o{ RolePermission : "IdPermission"
+  Role ||--o{ RolePermission : "IdRole"
+  Permission ||--o{ AccountPermission : "IdPermission"
+  Account ||--o{ AccountPermission : "UserName"
+  Account |o--o| Employee : "UserName"
+  Employee ||--o{ EmployeeActivity : "EmployeeId"
+  FoodCategory ||--o{ Food : "IdCategory"
+  Food ||--o{ FoodVariant : "IdFood"
+  Food ||--o{ FoodTopping : "IdFood"
+  Food ||--o{ FoodTopping : "IdTopping"
+  Food ||--o{ Recipe : "IdFood"
+  Ingredient ||--o{ Recipe : "IdIngredient"
+  FoodVariant |o--o{ Recipe : "IdVariant"
+  IngredientGroup |o--o{ Ingredient : "IdGroup"
+  Ingredient ||--o{ IngredientUnit : "IdIngredient"
+  ImportReceipt |o--o{ StockLot : "IdImportReceipt"
+  Ingredient ||--o{ StockLot : "IdIngredient"
+  WarehouseDocument |o--o{ StockMovement : "IdDocument"
+  ImportReceipt |o--o{ StockMovement : "IdImportReceipt"
+  Ingredient ||--o{ StockMovement : "IdIngredient"
+  KitchenOrderDetail |o--o{ StockMovement : "IdKitchenDetail"
+  StockLot |o--o{ StockMovement : "IdLot"
+  Supplier ||--o{ ImportReceipt : "IdSupplier"
+  Account ||--o{ ImportReceipt : "UserName"
+  ImportReceipt ||--o{ ImportDetail : "IdImportReceipt"
+  Ingredient ||--o{ ImportDetail : "IdIngredient"
+  StockLot |o--o{ ImportDetail : "IdLot"
+  WarehouseDocument ||--o{ WarehouseDocumentLine : "IdDocument"
+  Ingredient ||--o{ WarehouseDocumentLine : "IdIngredient"
+  Area |o--o{ TableFood : "IdArea"
+  Customer |o--o{ Bill : "IdCustomer"
+  CashierShift |o--o{ Bill : "IdShift"
+  TableFood |o--o{ Bill : "IdTable"
+  Bill ||--o{ BillInfo : "IdBill"
+  Food ||--o{ BillInfo : "IdFood"
+  FoodVariant |o--o{ BillInfo : "IdVariant"
+  Bill ||--o{ KitchenOrder : "IdBill"
+  BillInfo |o--o{ KitchenOrderDetail : "IdBillInfo"
+  Food ||--o{ KitchenOrderDetail : "IdFood"
+  KitchenOrder ||--o{ KitchenOrderDetail : "IdKitchenOrder"
+  Bill |o--o{ QrOrderRequest : "IdBill"
+  TableFood ||--o{ QrOrderRequest : "IdTable"
+  CustomerGroup |o--o{ Customer : "IdGroup"
+  Bill ||--o{ CustomerPointEntry : "IdBill"
+  Customer ||--o{ CustomerPointEntry : "IdCustomer"
+  Account ||--o| CashierShift : "UserName"
+  Bill |o--o{ CashEntry : "IdBill"
+  ImportReceipt |o--o{ CashEntry : "IdImportReceipt"
+  CashierShift |o--o{ CashEntry : "IdShift"

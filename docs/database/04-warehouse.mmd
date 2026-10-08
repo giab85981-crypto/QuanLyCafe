@@ -1,0 +1,27 @@
+erDiagram
+  direction LR
+  Supplier {
+    int Id PK
+  }
+  ImportReceipt {
+    int Id PK
+    int IdSupplier FK
+    nvarchar UserName FK
+  }
+  ImportDetail {
+    int Id PK
+    int IdImportReceipt FK
+    int IdIngredient FK
+    int IdLot FK
+  }
+  WarehouseDocument {
+    int Id PK
+  }
+  WarehouseDocumentLine {
+    int Id PK
+    int IdDocument FK
+    int IdIngredient FK
+  }
+  Supplier ||--o{ ImportReceipt : "IdSupplier"
+  ImportReceipt ||--o{ ImportDetail : "IdImportReceipt"
+  WarehouseDocument ||--o{ WarehouseDocumentLine : "IdDocument"

@@ -1,0 +1,16 @@
+erDiagram
+  direction LR
+  CustomerGroup {
+    int Id PK
+  }
+  Customer {
+    int Id PK
+    int IdGroup FK
+  }
+  CustomerPointEntry {
+    int Id PK
+    int IdBill FK
+    int IdCustomer FK
+  }
+  CustomerGroup |o--o{ Customer : "IdGroup"
+  Customer ||--o{ CustomerPointEntry : "IdCustomer"

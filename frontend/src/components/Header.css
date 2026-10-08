@@ -56,19 +56,35 @@
    3. NAVIGATION BAR (PILL CONTAINER)
    ========================================================================== */
 .app-header__nav {
+  position: relative;
+  flex: 1;
   display: flex;
   align-items: center;
-  background:var(--nav-blue);
-  border-radius:20px;
-  padding: 3px 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  flex-shrink: 1; /* Cho phép thanh menu thu hẹp linh hoạt */
-  min-width: 0;   /* Tránh tràn khung gây vỡ layout */
+  min-width: 0;
 }
 
-.app-header__nav::-webkit-scrollbar {
-  display: none;
+.header-nav-strip {
+  display: flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 3px 6px;
+  background: var(--nav-blue);
+  border-radius: 20px;
+}
+
+.header-nav-measure {
+  position: absolute;
+  display: flex;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  contain: layout style;
+}
+
+.header-nav-measure .app-header__tab {
+  font-weight: 700;
 }
 
 .app-header__tab {
@@ -80,6 +96,7 @@
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
+  text-decoration: none;
   border-radius:16px;
   flex-shrink: 0; /* Giữ chữ cố định, không bị co ép làm mất chữ */
   transition: background 0.15s ease;
@@ -93,6 +110,42 @@
   background:rgba(255, 255, 255, 0.25);
   font-weight: 700;
 }
+
+.header-more-toggle {
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  line-height: inherit;
+}
+
+.header-more-toggle.is-open { background: rgba(255, 255, 255, .2); }
+.header-more-toggle.is-open svg { transform: rotate(180deg); }
+.app-header__nav :is(a, button):focus-visible { outline: 2px solid #88bdf9; outline-offset: 2px; }
+.header-more-links {
+  top: calc(100% + 8px);
+  width: 250px;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  max-height: min(480px, calc(100dvh - 160px));
+  overflow-y: auto;
+}
+.header-more-link {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 10px 14px;
+  border-radius: 7px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-dark);
+  text-decoration: none;
+}
+.header-more-link:hover, .header-more-link.is-active {
+  color: var(--text-blue);
+  background: var(--theme-bg-eaf4ff, #eaf4ff);
+}
+.header-more-link.is-active { box-shadow: inset 3px 0 var(--text-blue); }
 
 /* ==========================================================================
    4. ACTIONS & BUTTONS
@@ -434,7 +487,6 @@ kbd {
   }
 }
 /* Compact action group and split screen switcher. */
-.header-branch{height:36px;display:inline-flex;align-items:center;gap:7px;padding:0 12px;border:1px solid var(--theme-border-d8e6f5, #d8e6f5);border-radius:20px;background:var(--theme-bg-ffffff, #fff);color:var(--theme-fg-2177cc, #2177cc);font-size:12px;font-weight:600;white-space:nowrap;box-shadow:0 2px 6px rgba(28,102,171,.05)}
 .header-sales{height:36px;display:flex;border:1px solid var(--theme-border-d8e6f5, #d8e6f5);border-radius:20px;background:var(--theme-bg-ffffff, #fff);box-shadow:0 2px 6px rgba(28,102,171,.07)}
 .header-sales button{display:flex;align-items:center;justify-content:center;gap:7px;background:transparent;color:var(--theme-fg-2177cc, #2177cc);border:0;font-family:inherit;font-size:13px;font-weight:650;cursor:pointer}
 .header-sales__main{padding:0 12px;border-radius:20px 0 0 20px}
@@ -456,5 +508,6 @@ kbd {
 .header-account-info small{font-size:12px;color:var(--theme-fg-7d8a9c, #7d8a9c)}
 .header-account-avatar{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:40px;height:40px;border-radius:50%;background:var(--theme-bg-edf6ff, #edf6ff);color:var(--theme-fg-2177cc, #2177cc)}
 .header-account-logout{color:var(--theme-fg-a43e3e, #a43e3e)}
-@media(max-width:1100px){.header-branch span{display:none}.header-branch{padding:0;width:36px;justify-content:center}.app-header__name{font-size:15px}}
-@media(max-width:760px){.app-header{height:auto;min-height:56px;flex-wrap:wrap;padding:10px 12px;gap:10px}.app-header__brand{margin-right:auto}.app-header__actions{gap:5px;position:relative;margin-left:auto}.app-header__actions .header-pop{position:static}.app-header__nav{order:3;width:100%;flex-shrink:0}.app-header__tab{padding:6px 10px}.header-branch{display:none}.header-sales__main{padding:0 9px}.header-screen-menu{right:0}.popover{max-width:calc(100vw - 24px)}}
+@media(max-width:1100px){.app-header__name{font-size:15px}}
+@media(max-width:760px){.app-header{height:auto;min-height:56px;flex-wrap:wrap;padding:10px 12px;gap:10px}.app-header__brand{margin-right:auto}.app-header__actions{gap:5px;position:relative;margin-left:auto}.app-header__actions .header-pop{position:static}.app-header__nav{order:3;width:100%;flex:0 0 100%}.app-header__tab{padding:6px 10px}.header-more-links{left:0;right:auto}.header-sales__main{padding:0 9px}.header-screen-menu{right:0}.popover{max-width:calc(100vw - 24px)}}
+@media(max-width:400px){.app-header__brand{gap:5px}.app-header__name{font-size:13px}.app-header__logo svg{width:20px}.app-header__actions{gap:4px}.app-header__actions .icon-btn{width:32px;height:32px}.header-sales__main{padding:0 7px}.header-sales .header-sales__toggle{width:27px}}

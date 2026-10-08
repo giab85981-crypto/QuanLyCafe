@@ -1,0 +1,38 @@
+erDiagram
+  direction LR
+  Role {
+    int Id PK
+  }
+  Account {
+    nvarchar UserName PK
+    int IdRole FK
+  }
+  Permission {
+    int Id PK
+  }
+  RolePermission {
+    int IdRole PK, FK
+    int IdPermission PK, FK
+  }
+  AccountPermission {
+    nvarchar UserName PK, FK
+    int IdPermission PK, FK
+  }
+  AccessAudit {
+    int Id PK
+  }
+  Employee {
+    int Id PK
+    nvarchar UserName FK
+  }
+  EmployeeActivity {
+    int Id PK
+    int EmployeeId FK
+  }
+  Role ||--o{ Account : "IdRole"
+  Permission ||--o{ RolePermission : "IdPermission"
+  Role ||--o{ RolePermission : "IdRole"
+  Permission ||--o{ AccountPermission : "IdPermission"
+  Account ||--o{ AccountPermission : "UserName"
+  Account |o--o| Employee : "UserName"
+  Employee ||--o{ EmployeeActivity : "EmployeeId"
